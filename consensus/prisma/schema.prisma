@@ -88,13 +88,17 @@ model Room {
 }
 
 model Membership {
-  id        String   @id @default(cuid())
-  roomId    String
-  userId    String
-  role      String   @default("participant") // "admin" | "participant"
-  joinedAt  DateTime @default(now())
-  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String    @id @default(cuid())
+  roomId        String
+  userId        String
+  role          String    @default("participant") // "admin" | "participant"
+  joinedAt      DateTime  @default(now())
+  voiceId       String?
+  voiceOptOut   Boolean   @default(false)
+  voiceBytes    Int       @default(0)
+  voiceClonedAt DateTime?
+  room          Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([roomId, userId])
   @@index([roomId])
