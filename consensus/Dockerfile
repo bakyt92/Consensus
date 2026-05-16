@@ -14,7 +14,11 @@
 #    SQLite file picks up new migrations before `next` starts.
 
 ARG NODE_VERSION=22-bookworm-slim
-ARG PNPM_VERSION=10.17.1
+# pnpm 11+ understands the `allowBuilds:` key in pnpm-workspace.yaml. With
+# pnpm 10 that key is silently ignored and every native postinstall (including
+# better-sqlite3) is skipped — the runtime then crashes on the first query
+# with "Could not locate the bindings file". Keep this in lockstep with local.
+ARG PNPM_VERSION=11.1.2
 
 # -----------------------------------------------------------------------------
 # 1. builder
