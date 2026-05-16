@@ -11,6 +11,7 @@ import { prisma } from "@/src/lib/prisma";
 import { getSessionUser } from "@/src/lib/session";
 import { transcribeAudio } from "@/src/server/integrations/slng";
 import { enqueueMessage } from "@/src/server/pipeline";
+import { accumulate as accumulateVoiceClone } from "@/src/server/voiceClonePipeline";
 
 export const runtime = "nodejs";
 
@@ -77,6 +78,17 @@ export async function POST(
   }
 
   await enqueueMessage({ roomId: room.id, userId: user.id, text });
+
+  // Fire-and-forget: accumulate raw audio for voice cloning. Skipped per-user
+  // when opted-out or already cloned; see src/server/voiceClonePipeline.ts.
+  void accumulateVoiceClone({
+    roomId: room.id,
+    userId: user.id,
+    audio: buf,
+    mime,
+  }).catch((err) =>
+    console.error("[voice] clone accumulator failed", err),
+  );
 
   return NextResponse.json({
     ok: true,

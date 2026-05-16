@@ -24,6 +24,7 @@ import {
   sendMessage,
   lockRoom,
   requestCloseMeeting,
+  setVoiceCloneOptOutAction,
 } from "@/src/lib/room-actions";
 import { getTemplate } from "@/src/lib/templates";
 
@@ -36,6 +37,8 @@ type Props = {
   isAdmin: boolean;
   me: { id: string; username: string };
   adminName: string;
+  voiceOptOut: boolean;
+  voiceCloned: boolean;
 };
 
 export function RoomClient(props: Props) {
@@ -53,11 +56,25 @@ export function RoomClient(props: Props) {
   const [kebabOpen, setKebabOpen] = useState(false);
   const [inspectorUserId, setInspectorUserId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const [voiceCloneOff, setVoiceCloneOff] = useState(props.voiceOptOut);
+  const [voiceClonePending, startVoiceCloneTransition] = useTransition();
   const feedRef = useRef<HTMLDivElement | null>(null);
   const template = getTemplate(props.template);
   const hasTemplate = template.labels.length > 0;
   const inspectorParticipant =
     participants.find((p) => p.userId === inspectorUserId) ?? null;
+
+  function toggleVoiceClone() {
+    const next = !voiceCloneOff;
+    setVoiceCloneOff(next);
+    startVoiceCloneTransition(async () => {
+      const r = await setVoiceCloneOptOutAction(props.code, next);
+      if (!r.ok) {
+        console.error(r.error);
+        setVoiceCloneOff(!next);
+      }
+    });
+  }
 
   useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight;
@@ -126,7 +143,13 @@ export function RoomClient(props: Props) {
       if (stubbed) setError("Voice in stub mode — set SLNG_API_KEY for real STT.");
     },
   });
-  const tts = useVoicePlayback({ code: props.code, messages });
+  const tts = useVoicePlayback({
+    code: props.code,
+    messages,
+    // Silence the mediator while the user is actively recording so the
+    // mic doesn't pick up TTS audio (or talk over the speaker).
+    suspended: voice.isRecording,
+  });
 
   return (
     <div className="room">
@@ -319,6 +342,28 @@ export function RoomClient(props: Props) {
                 ></span>{" "}
                 Mediator on
               </span>
+              <button
+                type="button"
+                onClick={toggleVoiceClone}
+                disabled={voiceClonePending}
+                className={"pill" + (!voiceCloneOff ? " ok" : "")}
+                style={{
+                  cursor: "pointer",
+                  border: "1px solid var(--line)",
+                  background: !voiceCloneOff
+                    ? "var(--ok-soft)"
+                    : "transparent",
+                }}
+                title="Your voice may be used for post-meeting Q&A."
+              >
+                {props.voiceCloned
+                  ? voiceCloneOff
+                    ? "Cloning paused (clone exists)"
+                    : "Voice cloning on"
+                  : voiceCloneOff
+                    ? "Voice cloning off"
+                    : "Voice cloning on"}
+              </button>
             </div>
           </div>
 
@@ -390,29 +435,25 @@ export function RoomClient(props: Props) {
                   disabled={
                     composeDisabled || voice.isUploading || !voice.supported
                   }
-                  onMouseDown={voice.start}
-                  onMouseUp={voice.stop}
-                  onMouseLeave={() => voice.isRecording && voice.stop()}
-                  onTouchStart={(e) => {
-                    e.preventDefault();
-                    void voice.start();
-                  }}
-                  onTouchEnd={(e) => {
-                    e.preventDefault();
-                    voice.stop();
-                  }}
+                  onClick={voice.toggle}
                   title={
                     !voice.supported
                       ? "Voice input not supported in this browser"
                       : voice.isRecording
-                        ? "Release to send"
+                        ? `Recording ${formatElapsed(voice.elapsedMs)} — click to stop`
                         : voice.isUploading
                           ? "Transcribing…"
-                          : "Hold to speak"
+                          : "Click to speak"
                   }
                   type="button"
                 >
-                  <Mic />
+                  {voice.isRecording ? (
+                    <span className="rec-timer" aria-live="polite">
+                      <span className="rec-dot" /> {formatElapsed(voice.elapsedMs)}
+                    </span>
+                  ) : (
+                    <Mic />
+                  )}
                 </button>
                 <button
                   className="icon-btn send"
@@ -642,6 +683,13 @@ export function RoomClient(props: Props) {
       />
     </div>
   );
+}
+
+function formatElapsed(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 function ChatBubble({

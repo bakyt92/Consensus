@@ -470,6 +470,28 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .icon-btn.active { background: var(--rust); color: var(--cream); }
 .icon-btn.send { background: var(--navy); color: var(--cream); }
 .icon-btn.send:hover { background: var(--navy-2); }
+.icon-btn.recording {
+  width: auto;
+  padding: 0 10px;
+  background: var(--rust);
+  color: var(--cream);
+  border-color: var(--rust);
+}
+.icon-btn.recording:hover { background: var(--rust); }
+.rec-timer {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px; font-weight: 600;
+}
+.rec-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: currentColor;
+  animation: rec-pulse 1s ease-in-out infinite;
+}
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
 
 /* consensus bar */
 .consensus-card { padding: 18px 20px; }

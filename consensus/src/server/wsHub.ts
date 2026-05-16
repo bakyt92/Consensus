@@ -25,6 +25,7 @@ export type WsEvent =
     }
   | { type: "status"; status: "PENDING" | "OPEN" | "LOCKED" | "STOPPING" | "CLOSED" }
   | { type: "participants"; participants: Participant[] }
+  | { type: "voiceCloned"; userId: string; voiceId: string }
   | { type: "closed"; redirectTo: string };
 
 export type WsSpan = {

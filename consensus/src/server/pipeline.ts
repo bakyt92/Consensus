@@ -19,13 +19,8 @@ import { prisma } from "@/src/lib/prisma";
 import { loadPrompt } from "@/src/lib/prompts";
 import { broadcast, type WsSpan } from "./wsHub";
 import { callMediator, type ConversationItem } from "./openai";
-import { classifyUtterance } from "./integrations/pioneer";
 import { classify as glinerClassify } from "./integrations/gliner";
 import { getTemplate } from "@/src/lib/templates";
-
-// If Pioneer is this confident the message is off-topic, skip the OpenAI turn
-// entirely — just mark filtered and broadcast. Keeps GPT off the hot path.
-const PIONEER_SKIP_THRESHOLD = 0.8;
 
 type QueueState = {
   tail: Promise<void>;
@@ -137,35 +132,13 @@ async function runTurn(
     }
   }
 
-  // Two-tier inference: Pioneer first (fast), OpenAI only if message clears
-  // the filter. Skipping OpenAI is the whole point — keeps cost + latency
-  // low and lets the mediator stay quiet on noise.
+  // Off-topic filtering disabled: every user message goes to the mediator and
+  // stays visible in chat. Pioneer is skipped to avoid the wasted call.
+  //
+  // GLiNER classification (label + sentiment) still runs on each user message
+  // so the side-panel histogram and message badges have data. Fail-soft:
+  // any error leaves the message un-classified and the mediator turn continues.
   if (newMessageId && newMessage) {
-    const verdict = await classifyUtterance({
-      text: newMessage.text,
-      agenda: room.agenda,
-      criteria: room.criteria,
-      username: newMessage.username,
-    }).catch((err) => {
-      console.error("[pipeline] pioneer classify failed, falling through", err);
-      return null;
-    });
-    if (
-      verdict &&
-      !verdict.isOnTopic &&
-      verdict.confidence >= PIONEER_SKIP_THRESHOLD
-    ) {
-      await prisma.message.update({
-        where: { id: newMessageId },
-        data: { filtered: true },
-      });
-      await broadcastMessage(roomId, newMessageId);
-      return;
-    }
-
-    // GLiNER classification — runs only on on-topic user messages. Fail-soft:
-    // any error or timeout just leaves the message un-classified and the
-    // mediator turn continues.
     const template = getTemplate(room.template);
     if (template.labels.length > 0) {
       try {
@@ -194,6 +167,19 @@ async function runTurn(
   const systemPrompt = await loadPrompt("system");
   const turnPrompt = await loadPrompt(newMessage ? "turn" : "kickoff");
 
+  const memberships = await prisma.membership.findMany({
+    where: { roomId },
+    include: { user: { select: { username: true } } },
+  });
+  const participants = memberships
+    .filter((m) => m.user)
+    .map((m) => ({
+      username: m.user!.username,
+      role: (m.role === "admin" ? "admin" : "participant") as
+        | "admin"
+        | "participant",
+    }));
+
   const out = await callMediator({
     systemPrompt,
     turnPrompt,
@@ -201,35 +187,38 @@ async function runTurn(
     criteria: room.criteria,
     history,
     newMessage,
+    participants,
   });
 
-  // Mark filtered on the user message if the model said it was off-topic
-  if (newMessageId && !out.isOnTopic) {
-    await prisma.message.update({
-      where: { id: newMessageId },
-      data: { filtered: true },
+  // Insert mediator reply only when the model chose to speak. Kickoff
+  // (no newMessage) always speaks — that's the opening question.
+  const isKickoff = !newMessage;
+  const replyText = out.mediatorReply.trim();
+  const willReply = (isKickoff || out.shouldReply) && replyText.length > 0;
+
+  let summarySeq = await nextSeq(roomId);
+  if (willReply) {
+    const mediator = await prisma.message.create({
+      data: {
+        roomId,
+        role: "mediator",
+        text: replyText,
+        seq: summarySeq,
+      },
     });
-    await broadcastMessage(roomId, newMessageId);
+    await broadcastMessage(roomId, mediator.id);
+  } else {
+    // No new message row, so the summary anchors to the most recent existing
+    // message (typically the user message that just arrived).
+    summarySeq = summarySeq - 1;
   }
-
-  // Insert mediator reply
-  const seq = await nextSeq(roomId);
-  const mediator = await prisma.message.create({
-    data: {
-      roomId,
-      role: "mediator",
-      text: out.mediatorReply,
-      seq,
-    },
-  });
-  await broadcastMessage(roomId, mediator.id);
 
   // Persist updated summary
   await prisma.summary.create({
     data: {
       roomId,
       markdown: out.updatedSummaryMarkdown,
-      afterMessageSeq: seq,
+      afterMessageSeq: summarySeq,
     },
   });
   broadcast(roomId, { type: "summary", markdown: out.updatedSummaryMarkdown });
@@ -240,7 +229,7 @@ async function runTurn(
       roomId,
       status: out.consensusStatus,
       percent: out.consensusPercent,
-      afterMessageSeq: seq,
+      afterMessageSeq: summarySeq,
     },
   });
   await prisma.room.update({

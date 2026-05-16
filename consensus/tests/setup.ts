@@ -17,7 +17,7 @@ process.env.DATABASE_URL = `file:${dbFile}`;
 process.env.AUTH_SECRET =
   process.env.AUTH_SECRET ?? "test-secret-please-change-x-x-x-x-x-x";
 process.env.APP_ORIGIN = "http://localhost:3000";
-process.env.NODE_ENV = "test";
+(process.env as Record<string, string>).NODE_ENV = "test";
 // Skip real email delivery — the dev mail driver just logs.
 delete process.env.RESEND_API_KEY;
 

@@ -31,6 +31,11 @@ export default async function RoomPage({
 
   const isAdmin = room.adminId === user.id;
 
+  const myMembership = await prisma.membership.findUnique({
+    where: { roomId_userId: { roomId: room.id, userId: user.id } },
+    select: { voiceOptOut: true, voiceClonedAt: true },
+  });
+
   return (
     <RoomClient
       code={room.code}
@@ -45,6 +50,8 @@ export default async function RoomPage({
           ? user.username
           : (await prisma.user.findUnique({ where: { id: room.adminId } }))?.username ?? "Facilitator"
       }
+      voiceOptOut={Boolean(myMembership?.voiceOptOut)}
+      voiceCloned={Boolean(myMembership?.voiceClonedAt)}
     />
   );
 }

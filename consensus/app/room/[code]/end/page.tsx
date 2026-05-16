@@ -6,6 +6,7 @@ import { Brandmark, Wordmark } from "@/src/components/Brand";
 import { Check } from "@/src/components/Icon";
 import { Markdown } from "@/src/components/Markdown";
 import { EndActions } from "./EndActions";
+import { QAPanel } from "./QAPanel";
 
 export default async function EndPage({
   params,
@@ -151,6 +152,17 @@ export default async function EndPage({
           </div>
 
           <Markdown source={summary} />
+
+          <QAPanel
+            code={room.code}
+            participants={room.memberships
+              .filter((m) => m.user)
+              .map((m) => ({
+                id: m.userId,
+                username: m.user!.username,
+                voiceCloned: Boolean(m.voiceClonedAt),
+              }))}
+          />
 
           <hr className="rule heavy" style={{ margin: "40px 0 20px" }} />
           <div className="label" style={{ textAlign: "center" }}>

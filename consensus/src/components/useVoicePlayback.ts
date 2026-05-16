@@ -8,9 +8,17 @@ const STORAGE_KEY = "consensus:tts-enabled";
 export type UseVoicePlaybackOptions = {
   code: string;
   messages: RoomMessage[];
+  // While true, current playback is paused and new mediator messages are
+  // marked seen without being played. Used to silence the mediator while
+  // the user's mic is recording.
+  suspended?: boolean;
 };
 
-export function useVoicePlayback({ code, messages }: UseVoicePlaybackOptions) {
+export function useVoicePlayback({
+  code,
+  messages,
+  suspended = false,
+}: UseVoicePlaybackOptions) {
   const [enabled, setEnabled] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const seenRef = useRef<Set<string>>(new Set());
@@ -41,13 +49,24 @@ export function useVoicePlayback({ code, messages }: UseVoicePlaybackOptions) {
     if (next.length === 0) return;
     for (const m of next) seenRef.current.add(m.id);
 
+    // While suspended, swallow the queue — mark messages seen but don't speak.
+    if (suspended) return;
+
     queueRef.current = queueRef.current.then(async () => {
       for (const m of next) {
         if (!m.text.trim()) continue;
         await playOne(code, m.text, audioRef, setSpeaking);
       }
     });
-  }, [enabled, messages, code]);
+  }, [enabled, messages, code, suspended]);
+
+  // Stop in-flight playback the moment we become suspended (mic recording).
+  useEffect(() => {
+    if (!suspended) return;
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setSpeaking(false);
+  }, [suspended]);
 
   const toggle = useCallback(() => {
     setEnabled((prev) => {
