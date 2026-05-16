@@ -18,7 +18,8 @@ const _client = (() => {
 
 export const MediatorOutput = z.object({
   isOnTopic: z.boolean(),
-  mediatorReply: z.string().min(1),
+  shouldReply: z.boolean(),
+  mediatorReply: z.string(),
   updatedSummaryMarkdown: z.string().min(1),
   consensusStatus: z.enum(["PENDING", "STALLED", "REACHED"]),
   consensusPercent: z.number().int().min(0).max(100),
@@ -31,6 +32,7 @@ const RESPONSE_SCHEMA = {
   additionalProperties: false,
   required: [
     "isOnTopic",
+    "shouldReply",
     "mediatorReply",
     "updatedSummaryMarkdown",
     "consensusStatus",
@@ -42,9 +44,15 @@ const RESPONSE_SCHEMA = {
       description:
         "Whether the new participant message is a substantive on-topic contribution. True if there is no new message.",
     },
+    shouldReply: {
+      type: "boolean",
+      description:
+        "True ONLY when the mediator has high confidence intervening will help — e.g. clearly off-topic, surfacing a tension, redirecting a stall, recapping a moment of alignment, or signalling consensus reached. False for routine on-topic contributions where letting participants continue is better.",
+    },
     mediatorReply: {
       type: "string",
-      description: "Short message from the mediator addressed to the room.",
+      description:
+        "Short message from the mediator addressed to the room. Required and non-empty when shouldReply is true; should be an empty string when shouldReply is false.",
     },
     updatedSummaryMarkdown: {
       type: "string",

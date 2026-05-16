@@ -128,24 +128,35 @@ async function runTurn(
     newMessage,
   });
 
-  // Insert mediator reply
-  const seq = await nextSeq(roomId);
-  const mediator = await prisma.message.create({
-    data: {
-      roomId,
-      role: "mediator",
-      text: out.mediatorReply,
-      seq,
-    },
-  });
-  await broadcastMessage(roomId, mediator.id);
+  // Insert mediator reply only when the model chose to speak. Kickoff
+  // (no newMessage) always speaks — that's the opening question.
+  const isKickoff = !newMessage;
+  const replyText = out.mediatorReply.trim();
+  const willReply = (isKickoff || out.shouldReply) && replyText.length > 0;
+
+  let summarySeq = await nextSeq(roomId);
+  if (willReply) {
+    const mediator = await prisma.message.create({
+      data: {
+        roomId,
+        role: "mediator",
+        text: replyText,
+        seq: summarySeq,
+      },
+    });
+    await broadcastMessage(roomId, mediator.id);
+  } else {
+    // No new message row, so the summary anchors to the most recent existing
+    // message (typically the user message that just arrived).
+    summarySeq = summarySeq - 1;
+  }
 
   // Persist updated summary
   await prisma.summary.create({
     data: {
       roomId,
       markdown: out.updatedSummaryMarkdown,
-      afterMessageSeq: seq,
+      afterMessageSeq: summarySeq,
     },
   });
   broadcast(roomId, { type: "summary", markdown: out.updatedSummaryMarkdown });
@@ -156,7 +167,7 @@ async function runTurn(
       roomId,
       status: out.consensusStatus,
       percent: out.consensusPercent,
-      afterMessageSeq: seq,
+      afterMessageSeq: summarySeq,
     },
   });
   await prisma.room.update({
