@@ -50,7 +50,11 @@ export async function POST(
 
   let result;
   try {
-    result = await synthesizeSpeech({ text, format: "mp3" });
+    // Mediator voice (per-utterance voice_id is set by the per-user Q&A route).
+    // 21m00Tcm4TlvDq8ikWAM is ElevenLabs' default "Rachel" preset.
+    const mediatorVoice =
+      process.env.MEDIATOR_VOICE_ID ?? "21m00Tcm4TlvDq8ikWAM";
+    result = await synthesizeSpeech({ text, voiceId: mediatorVoice });
   } catch (err) {
     console.error("[tts] synth failed", err);
     return NextResponse.json({ error: "Synth failed." }, { status: 502 });
