@@ -1,0 +1,19 @@
+Consensus
+
+We are going to build an app that will help mediate discussions and disputes or lead a meeting. The idea is that the user will set an agenda for the meeting and criteria to evaluate whether the consensus has been reached or the meeting goal achieved. Users can interact via chat or an STT interface on this topic. The task of our service is to talk to the users in a way that achieves the end result. In the middle, the current summary of the topic will be displayed. It should summarize all contributions from users in a single document that is displayed to everyone. This will be a Markdown-style doc. The LLM backend should filter out everything that it thinks is not related to the discussion or does not contribute to it in a healthy way. It should constantly validate whether the consensus has been reached. When it is, a status bar is shown and the admin can close the meeting; this will summarize the room and users can download the summary.
+
+The flow should be like this:
+
+Sign-up page with email and username.
+Create room page. The user can either join an existing meeting or create a new one.
+The create page has an agenda field and an evaluation criteria field. All fields should have popovers or subtitles explaining how they should be populated.
+After the room is created, the admin should have a button that closes the meeting so no new participants can enter.
+The main page has a chat interface with TTS and STT options. In the middle of the screen, a summarization MD is displayed along with the consensus status. The admin also has a button hidden in the interface to close the meeting before consensus is reached.
+When consensus is reached, the meeting status should change and the admin can close the meeting.
+The end screen should be shown to the users. It can reuse the main page, but there should be no chat interface, and there should be a button to download the meeting summary.
+
+I suggest we use Next.js for implementation. First, decide on the database model. There should be a user model and a conversation model.
+Next, let's decide on the flow. We will use OpenAI as the main agent. For TTS and STT we will use other platforms; we will integrate them later. For now, let's focus on the main functionality.
+The dialog flow should be like this: when the button is pressed to create a dialog, there should be a call to OpenAI to generate a starting question. After a starting question is generated for every user, the room is considered created and the conversation state changes. For errors, create a single error page that we will reuse. The text and subtitle may differ, but the screen itself should be reused. Next, when a user submits a response, it should be passed to the processing pipeline. The processing pipeline is serial, so if two users send their responses simultaneously, one starts being processed and the other is queued for processing afterward. This way we can ensure that each request to the LLM contains all information. It is important to include the user's message time but to provide responses in the order the LLM processed them. This way the LLM can resolve any timing issues if they occur. All prompts should be in a specific folder, written as text or MD files and loaded at runtime. Use structured output; the prompt should include a description of the evaluation criteria and consensus status, plus a special field in the structured output so the LLM can provide a typed consensus status. If the admin sends a request to stop the meeting, any subsequent requests should be denied, but the room should not close until all already-queued responses are processed.
+node_modules/next/dist/docs contains all the docs about Next.js best practices. Read it first.
+desing files are located in design folder. Make sure our implementations are aligned with this designs.

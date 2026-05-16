@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Consensus — Style Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Archivo:wght@400;500;600;700;800&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+
+  /* ---------- shared artboard utilities ---------- */
+  .ab { position: relative; width: 100%; height: 100%; box-sizing: border-box; overflow: hidden; }
+  .ab .row { display: flex; }
+  .swatch-row { display: flex; gap: 8px; }
+  .swatch { width: 56px; height: 56px; border-radius: 6px; }
+  .swatch.small { width: 40px; height: 40px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .meta-label { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.55; }
+
+  /* ===========================================================
+     1) EDITORIAL DIPLOMAT — serif, warm neutrals, parliamentary
+     =========================================================== */
+  .ab-editorial { background: #f4efe6; color: #1b1814; padding: 56px 60px; font-family: "Newsreader", Georgia, serif; }
+  .ab-editorial .brandhead { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 40px; }
+  .ab-editorial .logo-mark {
+    width: 96px; height: 96px; border-radius: 50%;
+    background: #1b1814; color: #f4efe6;
+    display: flex; align-items: center; justify-content: center;
+    font-family: "Newsreader", serif; font-weight: 500; font-size: 64px; line-height: 1;
+    font-style: italic;
+    letter-spacing: -0.02em;
+    position: relative;
+  }
+  .ab-editorial .logo-mark::after {
+    content: ""; position: absolute; right: 18px; bottom: 22px;
+    width: 8px; height: 8px; border-radius: 50%; background: #c4533a;
+  }
+  .ab-editorial .wordmark { font-size: 56px; font-weight: 400; letter-spacing: -0.025em; line-height: 0.95; }
+  .ab-editorial .wordmark em { color: #c4533a; font-style: italic; }
+  .ab-editorial h2 { font-size: 36px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.05; margin: 0 0 12px; }
+  .ab-editorial .lede { font-family: "Newsreader", serif; font-size: 16px; line-height: 1.55; max-width: 460px; color: #4a4339; }
+  .ab-editorial .divider { border-top: 1px solid #d6cfc0; margin: 32px 0; }
+  .ab-editorial .sample-card {
+    background: #faf6ee; border: 1px solid #ddd4c2; padding: 22px 24px; border-radius: 2px;
+    display: flex; gap: 24px; align-items: flex-start;
+  }
+  .ab-editorial .sample-card .colno { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.1em; color: #8a7e6a; }
+  .ab-editorial .sample-card h3 { margin: 6px 0 4px; font-size: 20px; font-weight: 500; }
+  .ab-editorial .sample-card p { margin: 0; font-size: 14px; line-height: 1.5; color: #564d40; }
+  .ab-editorial .status { background: #1b1814; color: #f4efe6; }
+  .ab-editorial .btn { background: #c4533a; color: #faf6ee; padding: 12px 20px; border-radius: 2px; font-family: "Newsreader", serif; font-size: 15px; display: inline-block; }
+  .ab-editorial .footer { position: absolute; left: 60px; right: 60px; bottom: 36px; display: flex; justify-content: space-between; align-items: flex-end; }
+
+  /* ===========================================================
+     2) SWISS MINIMAL — Helvetica, monochrome + 1 accent
+     =========================================================== */
+  .ab-swiss { background: #ffffff; color: #0a0a0a; padding: 56px 60px; font-family: "Helvetica Neue", Helvetica, "Inter Tight", sans-serif; }
+  .ab-swiss .brandhead { display: flex; align-items: center; gap: 24px; margin-bottom: 40px; }
+  .ab-swiss .logo-mark { width: 88px; height: 88px; position: relative; }
+  .ab-swiss .logo-mark .c1 { position: absolute; left: 0; top: 14px; width: 60px; height: 60px; border-radius: 50%; background: #0a0a0a; }
+  .ab-swiss .logo-mark .c2 { position: absolute; right: 0; top: 14px; width: 60px; height: 60px; border-radius: 50%; background: #ff5b1f; mix-blend-mode: multiply; }
+  .ab-swiss .wordmark { font-size: 44px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+  .ab-swiss .tag { font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #6b6b6b; margin-top: 8px; }
+  .ab-swiss h2 { font-size: 52px; font-weight: 700; letter-spacing: -0.035em; line-height: 1; margin: 0 0 16px; max-width: 540px; }
+  .ab-swiss .lede { font-size: 15px; line-height: 1.5; max-width: 440px; color: #555; }
+  .ab-swiss .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 40px; }
+  .ab-swiss .card { background: #f5f5f3; padding: 20px; border-radius: 4px; }
+  .ab-swiss .card .lab { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6b6b6b; }
+  .ab-swiss .card .num { font-size: 36px; font-weight: 700; letter-spacing: -0.03em; margin-top: 8px; }
+  .ab-swiss .card.accent { background: #ff5b1f; color: #fff; }
+  .ab-swiss .card.accent .lab { color: rgba(255,255,255,0.85); }
+  .ab-swiss .btn { background: #0a0a0a; color: #fff; padding: 12px 18px; border-radius: 4px; font-size: 14px; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; }
+  .ab-swiss .footer { position: absolute; left: 60px; right: 60px; bottom: 36px; display: flex; justify-content: space-between; align-items: center; }
+
+  /* ===========================================================
+     3) SOFT HUMANIST — DM Sans, sage + clay, rounded
+     =========================================================== */
+  .ab-soft { background: #efece4; color: #2a2722; padding: 56px 60px; font-family: "DM Sans", sans-serif; }
+  .ab-soft .brandhead { display: flex; align-items: center; gap: 22px; margin-bottom: 36px; }
+  .ab-soft .logo-mark { width: 92px; height: 92px; position: relative; }
+  .ab-soft .logo-mark .b1, .ab-soft .logo-mark .b2 {
+    position: absolute; width: 64px; height: 64px;
+    border-radius: 50% 50% 50% 8px;
+  }
+  .ab-soft .logo-mark .b1 { left: 0; top: 0; background: #6f8d6a; transform: rotate(-12deg); }
+  .ab-soft .logo-mark .b2 { right: 0; bottom: 0; background: #c97a52; transform: rotate(168deg); mix-blend-mode: multiply; }
+  .ab-soft .wordmark { font-size: 46px; font-weight: 600; letter-spacing: -0.035em; line-height: 1; }
+  .ab-soft .tag { font-size: 13px; font-weight: 500; color: #6f6557; margin-top: 6px; }
+  .ab-soft h2 { font-size: 32px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.15; margin: 0 0 12px; max-width: 480px; }
+  .ab-soft .lede { font-size: 15px; line-height: 1.55; max-width: 460px; color: #5b5448; }
+  .ab-soft .chat-preview { margin-top: 28px; display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
+  .ab-soft .bubble { padding: 12px 18px; border-radius: 22px; font-size: 14px; line-height: 1.45; max-width: 80%; }
+  .ab-soft .bubble.me { background: #6f8d6a; color: #f6f3eb; border-bottom-right-radius: 6px; align-self: flex-end; }
+  .ab-soft .bubble.them { background: #fff; color: #2a2722; border-bottom-left-radius: 6px; box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+  .ab-soft .bubble.them.mediator { background: #2a2722; color: #efece4; border-bottom-left-radius: 6px; align-self: flex-start; }
+  .ab-soft .footer { position: absolute; left: 60px; right: 60px; bottom: 36px; display: flex; justify-content: space-between; align-items: center; }
+  .ab-soft .btn { background: #2a2722; color: #efece4; padding: 12px 20px; border-radius: 999px; font-size: 14px; font-weight: 500; }
+
+  /* ===========================================================
+     4) TECHNICAL DARK — Plex Mono + Plex Sans, dark + acid
+     =========================================================== */
+  .ab-tech { background: #0e1116; color: #e6e6e6; padding: 56px 60px; font-family: "IBM Plex Sans", sans-serif; }
+  .ab-tech .grid-bg {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+  }
+  .ab-tech .brandhead { position: relative; display: flex; align-items: center; gap: 22px; margin-bottom: 40px; }
+  .ab-tech .logo-mark {
+    width: 88px; height: 88px;
+    border: 1.5px solid #c5f25b;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: "IBM Plex Mono", monospace;
+    color: #c5f25b;
+    font-size: 38px; font-weight: 500;
+    position: relative;
+  }
+  .ab-tech .logo-mark::before { content: "["; position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 38px; }
+  .ab-tech .logo-mark::after { content: "]"; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 38px; }
+  .ab-tech .logo-mark span { font-size: 20px; font-weight: 600; color: #fff; }
+  .ab-tech .wordmark { font-family: "IBM Plex Mono", monospace; font-size: 36px; font-weight: 500; letter-spacing: -0.02em; line-height: 1; }
+  .ab-tech .wordmark::after { content: "_"; color: #c5f25b; animation: blink 1.1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .ab-tech .tag { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.1em; color: #7a8190; margin-top: 8px; }
+  .ab-tech h2 { font-size: 38px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.05; margin: 0 0 14px; max-width: 540px; position: relative; }
+  .ab-tech .lede { font-size: 14px; line-height: 1.6; max-width: 460px; color: #9ba3b1; position: relative; }
+  .ab-tech .terminal {
+    position: relative; margin-top: 28px; max-width: 540px;
+    background: #161a22; border: 1px solid #232934; border-radius: 8px;
+    font-family: "IBM Plex Mono", monospace; font-size: 13px;
+    overflow: hidden;
+  }
+  .ab-tech .terminal .bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid #232934; background: #11151b; }
+  .ab-tech .terminal .bar i { width: 10px; height: 10px; border-radius: 50%; background: #2a313d; display: block; }
+  .ab-tech .terminal .body { padding: 14px 16px; color: #cfd6e0; line-height: 1.6; }
+  .ab-tech .terminal .body .k { color: #c5f25b; }
+  .ab-tech .terminal .body .ok { color: #c5f25b; }
+  .ab-tech .terminal .body .dim { color: #6c7383; }
+  .ab-tech .footer { position: absolute; left: 60px; right: 60px; bottom: 36px; display: flex; justify-content: space-between; align-items: center; z-index: 1; }
+  .ab-tech .btn { background: #c5f25b; color: #0e1116; padding: 11px 18px; border-radius: 6px; font-family: "IBM Plex Mono", monospace; font-size: 13px; font-weight: 500; }
+
+  /* ===========================================================
+     5) BOLD CIVIC — Archivo, navy + cream + rust, badge
+     =========================================================== */
+  .ab-civic { background: #f3ecd9; color: #11243a; padding: 56px 60px; font-family: "Archivo", sans-serif; }
+  .ab-civic .brandhead { display: flex; align-items: center; gap: 24px; margin-bottom: 36px; }
+  .ab-civic .logo-mark {
+    width: 96px; height: 96px;
+    background: #11243a;
+    color: #f3ecd9;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    font-family: "Archivo", sans-serif; font-weight: 800; font-size: 44px; letter-spacing: -0.04em;
+  }
+  .ab-civic .logo-mark::before {
+    content: ""; position: absolute; inset: 6px;
+    border: 1.5px solid rgba(243,236,217,0.35);
+    border-radius: 50%;
+  }
+  .ab-civic .logo-mark .star { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); width: 10px; height: 10px; background: #c54d2c; border-radius: 50%; }
+  .ab-civic .wordmark { font-size: 52px; font-weight: 800; letter-spacing: -0.05em; line-height: 0.95; text-transform: uppercase; }
+  .ab-civic .tag { font-family: "Archivo", sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #11243a; opacity: 0.6; margin-top: 8px; }
+  .ab-civic h2 { font-size: 44px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.0; margin: 0 0 14px; max-width: 560px; text-transform: uppercase; }
+  .ab-civic .lede { font-size: 15px; line-height: 1.5; max-width: 460px; color: #364a64; }
+  .ab-civic .stack { display: flex; gap: 12px; margin-top: 28px; align-items: stretch; }
+  .ab-civic .stack .col {
+    flex: 1; background: #11243a; color: #f3ecd9; padding: 18px 18px 20px; border-radius: 4px;
+    display: flex; flex-direction: column; justify-content: space-between; min-height: 120px;
+  }
+  .ab-civic .stack .col.accent { background: #c54d2c; }
+  .ab-civic .stack .col.outline { background: transparent; color: #11243a; border: 1.5px solid #11243a; }
+  .ab-civic .stack .col .lab { font-size: 10px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.7; }
+  .ab-civic .stack .col .v { font-size: 26px; font-weight: 800; letter-spacing: -0.025em; margin-top: 8px; }
+  .ab-civic .footer { position: absolute; left: 60px; right: 60px; bottom: 36px; display: flex; justify-content: space-between; align-items: center; }
+  .ab-civic .btn { background: #c54d2c; color: #f3ecd9; padding: 12px 22px; border-radius: 2px; font-family: "Archivo", sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+
+  /* ---------- palette strip used in all artboards ---------- */
+  .palette { position: absolute; left: 60px; bottom: 36px; display: flex; gap: 8px; align-items: center; }
+  .palette .meta-label { margin-right: 8px; }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+
+<script type="text/babel">
+const { DesignCanvas, DCSection, DCArtboard } = window;
+
+function Editorial() {
+  return (
+    <div className="ab ab-editorial" data-screen-label="01 Editorial Diplomat">
+      <div className="brandhead">
+        <div>
+          <div className="meta-label" style={{marginBottom: 14}}>01 · Editorial Diplomat</div>
+          <div className="wordmark">Consensus<em>.</em></div>
+        </div>
+        <div className="logo-mark">C</div>
+      </div>
+      <h2>Where parties find the<br/>common ground.</h2>
+      <p className="lede">A serif-led, document-first interface for facilitated discussions that read like the minutes of a respected institution.</p>
+      <div className="divider"></div>
+      <div className="sample-card">
+        <div style={{flex:1}}>
+          <div className="colno">§ 03 · MOTION SUMMARY</div>
+          <h3>Hybrid working policy</h3>
+          <p>Three of four participants support a two-day in-office minimum; one objects to fixed days. Convergence on flexibility, divergence on enforcement.</p>
+        </div>
+        <span className="pill status"><span className="dot" style={{background:'#c4533a'}}></span> 78% aligned</span>
+      </div>
+      <div className="footer">
+        <div className="palette">
+          <span className="meta-label">Palette</span>
+          <div className="swatch small" style={{background:'#1b1814'}}></div>
+          <div className="swatch small" style={{background:'#f4efe6'}}></div>
+          <div className="swatch small" style={{background:'#faf6ee'}}></div>
+          <div className="swatch small" style={{background:'#c4533a'}}></div>
+          <div className="swatch small" style={{background:'#d6cfc0'}}></div>
+        </div>
+        <a className="btn">Close motion ⟶</a>
+      </div>
+    </div>
+  );
+}
+
+function Swiss() {
+  return (
+    <div className="ab ab-swiss" data-screen-label="02 Swiss Minimal">
+      <div className="brandhead">
+        <div className="logo-mark">
+          <span className="c1"></span>
+          <span className="c2"></span>
+        </div>
+        <div>
+          <div className="wordmark">Consensus</div>
+          <div className="tag">Facilitation, structured.</div>
+        </div>
+      </div>
+      <h2>Two views.<br/>One document.</h2>
+      <p className="lede">Maximum signal, zero ornament. Helvetica, grid, a single warm accent. The product disappears so the conversation can lead.</p>
+      <div className="grid">
+        <div className="card">
+          <div className="lab">Participants</div>
+          <div className="num">04</div>
+        </div>
+        <div className="card accent">
+          <div className="lab">Consensus</div>
+          <div className="num">82%</div>
+        </div>
+      </div>
+      <div className="footer">
+        <div className="palette">
+          <span className="meta-label">Palette</span>
+          <div className="swatch small" style={{background:'#0a0a0a'}}></div>
+          <div className="swatch small" style={{background:'#ffffff', boxShadow:'inset 0 0 0 1px #e5e5e0'}}></div>
+          <div className="swatch small" style={{background:'#f5f5f3'}}></div>
+          <div className="swatch small" style={{background:'#ff5b1f'}}></div>
+          <div className="swatch small" style={{background:'#6b6b6b'}}></div>
+        </div>
+        <a className="btn">Open room →</a>
+      </div>
+    </div>
+  );
+}
+
+function Soft() {
+  return (
+    <div className="ab ab-soft" data-screen-label="03 Soft Humanist">
+      <div className="brandhead">
+        <div className="logo-mark">
+          <span className="b1"></span>
+          <span className="b2"></span>
+        </div>
+        <div>
+          <div className="wordmark">Consensus</div>
+          <div className="tag">Talk it through, together.</div>
+        </div>
+      </div>
+      <h2>Hard conversations,<br/>handled softly.</h2>
+      <p className="lede">A warm, conversational palette that signals safety. Rounded forms, sage + clay, generous whitespace.</p>
+      <div className="chat-preview">
+        <div className="bubble them">I think Tuesdays and Thursdays should be mandatory in-office.</div>
+        <div className="bubble me">Agreed on a structure — but Wednesdays work better for my team.</div>
+        <div className="bubble them mediator">I'm hearing alignment on <b>two fixed days</b>, with disagreement on <b>which days</b>. Would Tue + Wed be acceptable?</div>
+      </div>
+      <div className="footer">
+        <div className="palette">
+          <span className="meta-label">Palette</span>
+          <div className="swatch small" style={{background:'#2a2722'}}></div>
+          <div className="swatch small" style={{background:'#efece4'}}></div>
+          <div className="swatch small" style={{background:'#6f8d6a'}}></div>
+          <div className="swatch small" style={{background:'#c97a52'}}></div>
+          <div className="swatch small" style={{background:'#ffffff', boxShadow:'inset 0 0 0 1px #e5e1d6'}}></div>
+        </div>
+        <a className="btn">Continue</a>
+      </div>
+    </div>
+  );
+}
+
+function Tech() {
+  return (
+    <div className="ab ab-tech" data-screen-label="04 Technical Dark">
+      <div className="grid-bg"></div>
+      <div className="brandhead">
+        <div className="logo-mark"><span>C</span></div>
+        <div>
+          <div className="wordmark">consensus</div>
+          <div className="tag">// MEDIATION.ENGINE v0.4</div>
+        </div>
+      </div>
+      <h2>Argue with the algorithm,<br/>not each other.</h2>
+      <p className="lede">A developer-grade tool for structured debate. Plex Mono + Sans, deep navy with a single acid accent. For teams that ship.</p>
+      <div className="terminal">
+        <div className="bar"><i></i><i></i><i></i></div>
+        <div className="body">
+          <div><span className="dim">$</span> consensus eval <span className="k">--room=ENG-237</span></div>
+          <div><span className="dim">→ analyzing 14 contributions...</span></div>
+          <div><span className="ok">✓</span> alignment: <span className="ok">82%</span> · convergence: <span className="ok">+12% (5m)</span></div>
+          <div><span className="ok">✓</span> threshold met: <span className="ok">CONSENSUS_REACHED</span></div>
+        </div>
+      </div>
+      <div className="footer">
+        <div className="palette">
+          <span className="meta-label" style={{color:'#7a8190'}}>palette</span>
+          <div className="swatch small" style={{background:'#0e1116'}}></div>
+          <div className="swatch small" style={{background:'#161a22'}}></div>
+          <div className="swatch small" style={{background:'#232934'}}></div>
+          <div className="swatch small" style={{background:'#c5f25b'}}></div>
+          <div className="swatch small" style={{background:'#e6e6e6'}}></div>
+        </div>
+        <a className="btn">$ close --room</a>
+      </div>
+    </div>
+  );
+}
+
+function Civic() {
+  return (
+    <div className="ab ab-civic" data-screen-label="05 Bold Civic">
+      <div className="brandhead">
+        <div className="logo-mark">
+          C
+          <span className="star"></span>
+        </div>
+        <div>
+          <div className="wordmark">Consensus</div>
+          <div className="tag">A protocol for getting to yes.</div>
+        </div>
+      </div>
+      <h2>Every voice<br/>counts. Twice.</h2>
+      <p className="lede">A civic, almost editorial gravity. Heavy display type, navy and cream, rust accents. Feels like the constitution of a small, well-run republic.</p>
+      <div className="stack">
+        <div className="col">
+          <div className="lab">Motion</div>
+          <div className="v">Hybrid policy</div>
+        </div>
+        <div className="col accent">
+          <div className="lab">Quorum</div>
+          <div className="v">4 / 4</div>
+        </div>
+        <div className="col outline">
+          <div className="lab">Status</div>
+          <div className="v">Pending</div>
+        </div>
+      </div>
+      <div className="footer">
+        <div className="palette">
+          <span className="meta-label">Palette</span>
+          <div className="swatch small" style={{background:'#11243a'}}></div>
+          <div className="swatch small" style={{background:'#f3ecd9'}}></div>
+          <div className="swatch small" style={{background:'#c54d2c'}}></div>
+          <div className="swatch small" style={{background:'#364a64'}}></div>
+          <div className="swatch small" style={{background:'#ffffff', boxShadow:'inset 0 0 0 1px #ddd2b3'}}></div>
+        </div>
+        <a className="btn">Cast vote</a>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection id="brand" title="Consensus — Style Directions" subtitle="Five visual systems. Pick one (or mix two) and we'll build the full prototype against it.">
+        <DCArtboard id="editorial" label="01 · Editorial Diplomat" width={1100} height={720}>
+          <Editorial />
+        </DCArtboard>
+        <DCArtboard id="swiss" label="02 · Swiss Minimal" width={1100} height={720}>
+          <Swiss />
+        </DCArtboard>
+        <DCArtboard id="soft" label="03 · Soft Humanist" width={1100} height={720}>
+          <Soft />
+        </DCArtboard>
+        <DCArtboard id="tech" label="04 · Technical Dark" width={1100} height={720}>
+          <Tech />
+        </DCArtboard>
+        <DCArtboard id="civic" label="05 · Bold Civic" width={1100} height={720}>
+          <Civic />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+// Consensus — Prisma schema (SQLite for hackathon, swappable to Postgres)
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  username     String
+  createdAt    DateTime     @default(now())
+  sessions     Session[]
+  magicLinks   MagicLink[]
+  memberships  Membership[]
+  messages     Message[]
+  roomsCreated Room[]       @relation("RoomAdmin")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model MagicLink {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Room lifecycle:
+//   PENDING  — admin just created it; LLM is generating opening prompt
+//   OPEN     — anyone with code can join, discussion live
+//   LOCKED   — no new joins (admin toggled); existing participants still active
+//   STOPPING — admin requested close; queue is draining
+//   CLOSED   — meeting over, summary finalized
+
+enum RoomStatus {
+  PENDING
+  OPEN
+  LOCKED
+  STOPPING
+  CLOSED
+}
+
+enum ConsensusStatus {
+  PENDING
+  STALLED
+  REACHED
+}
+
+model Room {
+  id              String       @id @default(cuid())
+  code            String       @unique
+  agenda          String
+  agendaTitle     String
+  criteria        String
+  maxParticipants Int          @default(8)
+  // One of: none | debate | brainstorm | standup | retro | negotiation.
+  // Stored as String for back-compat with existing rows; validated at the zod boundary.
+  template        String       @default("none")
+  status          RoomStatus   @default(PENDING)
+  consensus       ConsensusStatus @default(PENDING)
+  consensusPercent Int         @default(0)
+  finalSummary    String?
+  adminId         String
+  admin           User         @relation("RoomAdmin", fields: [adminId], references: [id])
+  createdAt       DateTime     @default(now())
+  closedAt        DateTime?
+  memberships     Membership[]
+  messages        Message[]
+  summaries       Summary[]
+  consensusSnaps  ConsensusSnapshot[]
+
+  @@index([adminId])
+}
+
+model Membership {
+  id            String    @id @default(cuid())
+  roomId        String
+  userId        String
+  role          String    @default("participant") // "admin" | "participant"
+  joinedAt      DateTime  @default(now())
+  voiceId       String?
+  voiceOptOut   Boolean   @default(false)
+  voiceBytes    Int       @default(0)
+  voiceClonedAt DateTime?
+  room          Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+}
+
+// Message.role:
+//   "system"   — system notice ("Room opened by X")
+//   "user"     — a participant utterance
+//   "mediator" — AI synthesis
+// filtered = true means the LLM decided it was off-topic; kept for transparency.
+
+model Message {
+  id        String   @id @default(cuid())
+  roomId    String
+  userId    String?
+  role      String   // "system" | "user" | "mediator"
+  text      String
+  filtered  Boolean  @default(false)
+  sentAt    DateTime @default(now()) // wall-clock time when received
+  seq       Int      // monotonic per-room order (LLM-processing order)
+  // GLiNER classification (set asynchronously after Pioneer on-topic check; null when stub or not yet classified).
+  category            String?
+  categoryConfidence  Float?
+  sentiment           String?  // "positive" | "negative" | "neutral"
+  sentimentConfidence Float?
+  spans               String?  // JSON-encoded GLiNER spans: [{label,text,start,end,confidence}, ...]
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([roomId, seq])
+}
+
+// Summary is the live markdown doc. We append-only-snapshot it after every
+// LLM turn so we can reconstruct any point in time and so closing the meeting
+// has an authoritative "last summary".
+model Summary {
+  id        String   @id @default(cuid())
+  roomId    String
+  markdown  String
+  createdAt DateTime @default(now())
+  afterMessageSeq Int // which message triggered this update
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+}
+
+model ConsensusSnapshot {
+  id        String          @id @default(cuid())
+  roomId    String
+  status    ConsensusStatus
+  percent   Int
+  reason    String?
+  createdAt DateTime        @default(now())
+  afterMessageSeq Int
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+}

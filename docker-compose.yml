@@ -1,0 +1,51 @@
+# Production compose for Consensus. Lives on the server at
+# /opt/consensus/docker-compose.yml and is overwritten by the deploy workflow.
+#
+# Hard requirements per the MegaDrive onboarding doc:
+#   - host-side port binding MUST be 127.0.0.1:8091 (loopback only — the host
+#     nginx is the only sanctioned ingress).
+#   - compose project name MUST be `consensus` (set via `-p consensus` in the
+#     workflow, since this file alone can't enforce it).
+#   - explicit resource limits so a misbehaving container can't starve
+#     MegaDrive on the shared host.
+
+services:
+  app:
+    image: ghcr.io/bakyt92/consensus:${IMAGE_TAG:-latest}
+    container_name: consensus-app
+    restart: unless-stopped
+    pull_policy: always
+    ports:
+      - "127.0.0.1:8091:8080"
+    env_file:
+      - .env
+    environment:
+      # Hard overrides. Keep these out of .env so they can't drift accidentally.
+      NODE_ENV: production
+      PORT: "8080"
+      DATABASE_URL: "file:/data/dev.db"
+      APP_ORIGIN: "https://consensus.rk9-vp9.online"
+    volumes:
+      - consensus-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    # 1 CPU / 512 MiB upper bound. Adjust after we see real usage; staying
+    # conservative on a host shared with MegaDrive.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  consensus-data:
+    name: consensus-data
