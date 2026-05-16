@@ -360,7 +360,13 @@ export function RoomClient(props: Props) {
 
           <div className="chat-feed" ref={feedRef}>
             {messages.map((m) => (
-              <ChatBubble key={m.id} m={m} meId={props.me.id} />
+              <ChatBubble
+                key={m.id}
+                m={m}
+                meId={props.me.id}
+                roomCode={props.code}
+                onError={setError}
+              />
             ))}
             {consensusMet && status !== "CLOSED" && (
               <div
@@ -639,13 +645,45 @@ function formatElapsed(ms: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function ChatBubble({ m, meId }: { m: RoomMessage; meId: string }) {
+function ChatBubble({
+  m,
+  meId,
+  roomCode,
+  onError,
+}: {
+  m: RoomMessage;
+  meId: string;
+  roomCode: string;
+  onError: (msg: string) => void;
+}) {
+  const [researching, setResearching] = useState(false);
+
   if (m.role === "system") {
     return (
       <div style={{ textAlign: "center", padding: "4px 0" }}>
         <span className="label" style={{ fontSize: 10 }}>
           · {m.text} ·
         </span>
+      </div>
+    );
+  }
+  if (m.role === "research") {
+    return (
+      <div
+        className="msg"
+        style={{
+          background: "var(--cream, #f8f5ec)",
+          border: "1px solid var(--line)",
+          borderRadius: 8,
+          padding: 12,
+        }}
+      >
+        <div className="avatar" style={{ background: "var(--rust, #b85c4a)" }}>
+          🔎
+        </div>
+        <div className="msg-body" style={{ flex: 1 }}>
+          <Markdown source={m.text} />
+        </div>
       </div>
     );
   }
@@ -674,6 +712,30 @@ function ChatBubble({ m, meId }: { m: RoomMessage; meId: string }) {
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  async function doResearch() {
+    if (researching) return;
+    setResearching(true);
+    try {
+      const res = await fetch(
+        `/api/room/${encodeURIComponent(roomCode)}/research`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messageId: m.id }),
+        },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        onError(body.error ?? `Research failed (${res.status})`);
+      }
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Research failed.");
+    } finally {
+      setResearching(false);
+    }
+  }
+
   return (
     <div className={"msg" + (isMediator ? " mediator" : "")}>
       <div className={"avatar" + (isMe ? " you" : "")}>{initials}</div>
@@ -681,6 +743,26 @@ function ChatBubble({ m, meId }: { m: RoomMessage; meId: string }) {
         <div className="msg-meta">
           <span className="msg-name">{displayName}</span>
           <span className="msg-time">{time}</span>
+          {!isMediator && (
+            <button
+              type="button"
+              onClick={doResearch}
+              disabled={researching}
+              title="Research this with the web"
+              style={{
+                marginLeft: 8,
+                padding: "2px 6px",
+                fontSize: 11,
+                background: "transparent",
+                border: "1px solid var(--line)",
+                borderRadius: 4,
+                cursor: researching ? "wait" : "pointer",
+                opacity: researching ? 0.6 : 1,
+              }}
+            >
+              {researching ? "🔎…" : "🔎 Research"}
+            </button>
+          )}
         </div>
         <div
           className="msg-text"

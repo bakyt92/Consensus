@@ -72,7 +72,7 @@ const RESPONSE_SCHEMA = {
 } as const;
 
 export type ConversationItem = {
-  role: "system" | "user" | "mediator";
+  role: "system" | "user" | "mediator" | "research";
   username: string | null;
   text: string;
   filtered: boolean;
@@ -96,6 +96,7 @@ export async function callMediator(args: CallMediatorArgs): Promise<MediatorOutp
     .map((m) => {
       if (m.role === "system") return `[system] ${m.text}`;
       if (m.role === "mediator") return `[mediator] ${m.text}`;
+      if (m.role === "research") return `[research note] ${m.text}`;
       return `[${m.username ?? "participant"}] ${m.text}`;
     })
     .join("\n");

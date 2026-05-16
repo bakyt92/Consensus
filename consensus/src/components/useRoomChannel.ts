@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 export type RoomMessage = {
   id: string;
-  role: "system" | "user" | "mediator";
+  role: "system" | "user" | "mediator" | "research";
   text: string;
   filtered: boolean;
   userId: string | null;
