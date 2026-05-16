@@ -17,10 +17,14 @@ function newCode() {
 const CreateInput = z.object({
   agenda: z.string().trim().min(10).max(2000),
   criteria: z.string().trim().min(10).max(2000),
-  maxParticipants: z.number().int().min(2).max(64),
+  // No longer collected from UI — default to 8 (sweet spot). Schema column
+  // kept for future "cap" UX; can drop in a later migration if unused.
+  maxParticipants: z.number().int().min(2).max(64).optional().default(8),
 });
 
-export async function createRoom(input: unknown) {
+export type CreateRoomResult = { ok: false; error: string };
+
+export async function createRoom(input: unknown): Promise<CreateRoomResult | never> {
   const user = await getSessionUser();
   if (!user) {
     return { ok: false as const, error: "Not signed in." };
@@ -61,6 +65,21 @@ export async function createRoom(input: unknown) {
   });
 
   redirect(`/room/${room.code}`);
+}
+
+/**
+ * Form-action variant for `<form action={createRoomFormAction}>`. The
+ * declarative pattern works pre-hydration; see `signupFormAction` for the
+ * background.
+ */
+export async function createRoomFormAction(
+  _prev: CreateRoomResult | null,
+  formData: FormData,
+): Promise<CreateRoomResult | never> {
+  return createRoom({
+    agenda: formData.get("agenda")?.toString() ?? "",
+    criteria: formData.get("criteria")?.toString() ?? "",
+  });
 }
 
 export async function joinRoom(code: string) {

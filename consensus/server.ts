@@ -35,10 +35,19 @@ async function main() {
 
   const wss = new WebSocketServer({ noServer: true });
 
+  // Next's dev HMR socket lives at /_next/webpack-hmr. Anything that isn't our
+  // /api/ws path we hand back to Next so its upgrade listener can take it —
+  // destroying it broke HMR and produced cascading client-side rebuild errors.
+  const nextUpgradeHandler = app.getUpgradeHandler?.();
+
   httpServer.on("upgrade", (req, socket, head) => {
     const url = parse(req.url ?? "/", true);
     if (url.pathname !== "/api/ws") {
-      socket.destroy();
+      if (nextUpgradeHandler) {
+        void nextUpgradeHandler(req, socket, head);
+      } else {
+        socket.destroy();
+      }
       return;
     }
 

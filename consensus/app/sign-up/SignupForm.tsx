@@ -1,52 +1,38 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { signupOrRequestLink } from "@/src/lib/auth-actions";
+import { signupFormAction } from "@/src/lib/auth-actions";
 import { ArrowRight } from "@/src/components/Icon";
 
+/**
+ * Why this is plain + minimal:
+ *
+ *   - <form action={formAction}> is the React 19 declarative pattern.
+ *     Next.js wires the form to the Server Action at SSR time, so the
+ *     POST happens correctly even before client JS finishes hydrating.
+ *   - We do NOT mirror inputs into useState for validation. Doing so
+ *     would couple the button-enabled state to hydration; if hydration
+ *     fails or is delayed, the user would see the button permanently
+ *     disabled. Instead we rely on HTML5 validation (required, type=email,
+ *     minLength) which the browser enforces natively before submit.
+ *   - `useActionState` only drives post-submit UX (showing magic-link
+ *     screen, errors, the spinner on the submit button). If JS hasn't
+ *     hydrated yet, the form still works — the user just doesn't get the
+ *     in-page result UI until the page round-trips.
+ */
 export function SignupForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
-  const [touched, setTouched] = useState<{ email?: boolean; username?: boolean }>({});
-  const [magicSent, setMagicSent] = useState<string | null>(null);
-  const [serverError, setServerError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [state, formAction, isPending] = useActionState(signupFormAction, null);
 
-  const emailValid = /^\S+@\S+\.\S+$/.test(email);
-  const usernameValid = username.trim().length >= 2;
-  const ready = emailValid && usernameValid;
+  useEffect(() => {
+    if (state?.kind === "session") {
+      router.replace("/lobby");
+      router.refresh();
+    }
+  }, [state, router]);
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setTouched({ email: true, username: true });
-    if (!ready) return;
-    setServerError(null);
-    startTransition(async () => {
-      let res: Awaited<ReturnType<typeof signupOrRequestLink>>;
-      try {
-        res = await signupOrRequestLink({ email, username });
-      } catch (err) {
-        // Server action threw across the RSC boundary (network / build error).
-        // Without this catch, React would surface the rejection to global-error
-        // and the form would appear to silently refresh.
-        const msg = err instanceof Error ? err.message : String(err);
-        setServerError(`Network error: ${msg}`);
-        return;
-      }
-      if (res.kind === "session") {
-        router.replace("/lobby");
-        router.refresh();
-      } else if (res.kind === "magic_sent") {
-        setMagicSent(res.email);
-      } else {
-        setServerError(res.message);
-      }
-    });
-  }
-
-  if (magicSent) {
+  if (state?.kind === "magic_sent") {
     return (
       <div style={{ maxWidth: 460, width: "100%" }}>
         <div className="label">STEP 01 · CHECK YOUR INBOX</div>
@@ -54,29 +40,19 @@ export function SignupForm() {
           We sent you<br />a link.
         </h1>
         <p className="body" style={{ maxWidth: 380, marginBottom: 24 }}>
-          We recognised <strong>{magicSent}</strong> from a previous session. Click
-          the magic link in your inbox to sign back in. It expires in 15 minutes.
+          We recognised <strong>{state.email}</strong> from a previous session.
+          Click the magic link in your inbox to sign back in. It expires in 15
+          minutes.
         </p>
         <p className="label" style={{ fontSize: 11 }}>
           DEV NOTE: WITHOUT A RESEND KEY, THE LINK IS LOGGED TO THE SERVER CONSOLE.
         </p>
-        <button
-          type="button"
-          className="btn btn-soft btn-sm"
-          style={{ marginTop: 24 }}
-          onClick={() => {
-            setMagicSent(null);
-            setEmail("");
-          }}
-        >
-          ← Use a different email
-        </button>
       </div>
     );
   }
 
   return (
-    <form onSubmit={submit} style={{ maxWidth: 460, width: "100%" }}>
+    <form action={formAction} style={{ maxWidth: 460, width: "100%" }}>
       <div className="label">STEP 01 · ACCOUNT</div>
       <h1 className="h1" style={{ margin: "12px 0 14px" }}>
         Create your<br />delegation.
@@ -88,32 +64,29 @@ export function SignupForm() {
 
       <div className="stack" style={{ ["--gap" as never]: "22px" }}>
         <div>
-          <label className="field-label">Email</label>
+          <label className="field-label" htmlFor="signup-email">Email</label>
           <input
+            id="signup-email"
+            name="email"
             className="input"
             type="email"
             placeholder="you@organisation.org"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, email: true }))}
             autoComplete="email"
+            required
           />
-          {touched.email && !emailValid && (
-            <div className="label" style={{ color: "var(--rust)", marginTop: 8 }}>
-              Enter a valid email.
-            </div>
-          )}
         </div>
         <div>
-          <label className="field-label">Username</label>
+          <label className="field-label" htmlFor="signup-username">Username</label>
           <input
+            id="signup-username"
+            name="username"
             className="input"
             type="text"
             placeholder="e.g. Maya R."
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, username: true }))}
             autoComplete="nickname"
+            required
+            minLength={2}
+            maxLength={40}
           />
           <div
             className="label"
@@ -132,12 +105,12 @@ export function SignupForm() {
         </div>
       </div>
 
-      {serverError && (
+      {state?.kind === "error" && (
         <div
           className="label"
           style={{ color: "var(--rust)", marginTop: 16, fontSize: 12 }}
         >
-          {serverError}
+          {state.message}
         </div>
       )}
 

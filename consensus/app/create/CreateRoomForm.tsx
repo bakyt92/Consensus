@@ -1,54 +1,41 @@
 "use client";
 
-import { useState, useTransition, useRef, useEffect } from "react";
-import { createRoom } from "@/src/lib/room-actions";
+import { useActionState, useRef } from "react";
+import { createRoomFormAction } from "@/src/lib/room-actions";
 import { ArrowRight, Eye } from "@/src/components/Icon";
 
-const SIZES = [2, 4, 6, 8, 12, 24];
+const EXAMPLE_AGENDA =
+  "Hybrid working policy — 2026 H1\n\nDetermine a shared minimum-days-in-office expectation across the engineering org, accounting for team rituals, parent schedules, and individual focus needs.";
+const EXAMPLE_CRITERIA =
+  "All four participants must explicitly agree on (a) a minimum number of days, and (b) whether those days are fixed company-wide or chosen per team. The agreement must include a quarterly review clause.";
 
+/**
+ * Declarative-form-action pattern (same as SignupForm) — the form's POST is
+ * wired by Next at SSR time, so submit works even pre-hydration. We deliberately
+ * do NOT mirror inputs into useState, because deriving `disabled` from local
+ * state coupled the button to hydration and broke /create previously
+ * (Consensus/BUGS.md). HTML5 `required` + `minLength` enforce validation
+ * natively in the browser.
+ *
+ * Popovers use <details>/<summary> so they open with zero JS — same reason.
+ * "Try with an example" still needs JS to fill the textareas; if hydration
+ * fails it just silently no-ops, but the rest of the form is unaffected.
+ */
 export function CreateRoomForm({ username }: { username: string }) {
-  const [agenda, setAgenda] = useState("");
-  const [criteria, setCriteria] = useState("");
-  const [maxParticipants, setMaxParticipants] = useState(8);
-  const [open, setOpen] = useState<"agenda" | "criteria" | "max" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const wrap = useRef<HTMLFormElement | null>(null);
+  const [state, formAction, isPending] = useActionState(createRoomFormAction, null);
+  const agendaRef = useRef<HTMLTextAreaElement | null>(null);
+  const criteriaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      if (!wrap.current) return;
-      if (!wrap.current.contains(e.target as Node)) setOpen(null);
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
-
-  function example() {
-    setAgenda(
-      "Hybrid working policy — 2026 H1\n\nDetermine a shared minimum-days-in-office expectation across the engineering org, accounting for team rituals, parent schedules, and individual focus needs.",
-    );
-    setCriteria(
-      "All four participants must explicitly agree on (a) a minimum number of days, and (b) whether those days are fixed company-wide or chosen per team. The agreement must include a quarterly review clause.",
-    );
-  }
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!agenda.trim() || !criteria.trim()) return;
-    setError(null);
-    startTransition(async () => {
-      const res = await createRoom({ agenda, criteria, maxParticipants });
-      // server action redirects on success; if it returns, it's an error
-      if (res && "error" in res) setError(res.error);
-    });
+  function fillExample() {
+    if (agendaRef.current) agendaRef.current.value = EXAMPLE_AGENDA;
+    if (criteriaRef.current) criteriaRef.current.value = EXAMPLE_CRITERIA;
   }
 
   return (
     <>
       <button
         type="button"
-        onClick={example}
+        onClick={fillExample}
         className="btn btn-soft btn-xs"
         style={{ marginBottom: 40 }}
       >
@@ -56,28 +43,19 @@ export function CreateRoomForm({ username }: { username: string }) {
       </button>
 
       <form
-        ref={wrap}
-        onSubmit={submit}
+        action={formAction}
         className="stack"
         style={{ ["--gap" as never]: "32px" }}
       >
         <div className="field-with-help">
           <div style={{ display: "flex", alignItems: "center", marginBottom: 0 }}>
-            <label className="field-label" style={{ marginBottom: 0 }}>
+            <label className="field-label" htmlFor="create-agenda" style={{ marginBottom: 0 }}>
               Agenda
             </label>
-            <button
-              type="button"
-              className="help-trigger"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen((p) => (p === "agenda" ? null : "agenda"));
-              }}
-              aria-label="What's a good agenda?"
-            >
-              ?
-            </button>
-            {open === "agenda" && (
+            <details className="help-details">
+              <summary className="help-trigger" aria-label="What's a good agenda?">
+                ?
+              </summary>
               <div className="popover" style={{ top: 32, left: 0 }}>
                 <div className="label on-navy">A GOOD AGENDA</div>
                 States <strong style={{ color: "var(--cream)" }}>what you're deciding</strong>,
@@ -93,7 +71,7 @@ export function CreateRoomForm({ username }: { username: string }) {
                   </li>
                 </ul>
               </div>
-            )}
+            </details>
           </div>
           <p
             className="body"
@@ -102,31 +80,27 @@ export function CreateRoomForm({ username }: { username: string }) {
             What is this meeting actually trying to settle? Stay concrete.
           </p>
           <textarea
+            ref={agendaRef}
+            id="create-agenda"
+            name="agenda"
             className="textarea"
             rows={4}
             placeholder="e.g. Decide on the minimum days-per-week expectation for in-office work, effective H1 2026."
-            value={agenda}
-            onChange={(e) => setAgenda(e.target.value)}
+            required
+            minLength={10}
+            maxLength={2000}
           />
         </div>
 
         <div className="field-with-help">
           <div style={{ display: "flex", alignItems: "center" }}>
-            <label className="field-label" style={{ marginBottom: 0 }}>
+            <label className="field-label" htmlFor="create-criteria" style={{ marginBottom: 0 }}>
               Evaluation criteria
             </label>
-            <button
-              type="button"
-              className="help-trigger"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen((p) => (p === "criteria" ? null : "criteria"));
-              }}
-              aria-label="How do I write evaluation criteria?"
-            >
-              ?
-            </button>
-            {open === "criteria" && (
+            <details className="help-details">
+              <summary className="help-trigger" aria-label="How do I write evaluation criteria?">
+                ?
+              </summary>
               <div className="popover" style={{ top: 32, left: 0 }}>
                 <div className="label on-navy">CRITERIA = "DONE"</div>
                 Describes how we'd know consensus has been{" "}
@@ -146,7 +120,7 @@ export function CreateRoomForm({ username }: { username: string }) {
                   </li>
                 </ul>
               </div>
-            )}
+            </details>
           </div>
           <p
             className="body"
@@ -156,63 +130,23 @@ export function CreateRoomForm({ username }: { username: string }) {
             satisfied.
           </p>
           <textarea
+            ref={criteriaRef}
+            id="create-criteria"
+            name="criteria"
             className="textarea"
             rows={4}
             placeholder="e.g. All four participants explicitly agree on (a) a minimum number of days and (b) whether those days are fixed or chosen per team."
-            value={criteria}
-            onChange={(e) => setCriteria(e.target.value)}
+            required
+            minLength={10}
+            maxLength={2000}
           />
-        </div>
-
-        <div>
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <label className="field-label" style={{ marginBottom: 0 }}>
-              Max participants
-            </label>
-            <button
-              type="button"
-              className="help-trigger"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen((p) => (p === "max" ? null : "max"));
-              }}
-              aria-label="Max participants"
-            >
-              ?
-            </button>
-            {open === "max" && (
-              <div className="popover" style={{ top: 32, left: 0 }}>
-                Hard cap on who can join via the code. After you lock the room, no one
-                new can enter regardless of cap.
-              </div>
-            )}
-          </div>
-          <p
-            className="body"
-            style={{ margin: "4px 0 12px", fontSize: 13, color: "var(--muted)" }}
-          >
-            Small rooms reach consensus faster. 4–8 is the sweet spot.
-          </p>
-          <div className="row" style={{ ["--gap" as never]: "8px", flexWrap: "wrap" }}>
-            {SIZES.map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setMaxParticipants(n)}
-                className={"btn btn-sm " + (maxParticipants === n ? "btn-ink" : "btn-soft")}
-                style={{ minWidth: 56 }}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
         </div>
 
         <hr className="rule" />
 
-        {error && (
+        {state?.error && (
           <div className="label" style={{ color: "var(--rust)" }}>
-            {error}
+            {state.error}
           </div>
         )}
 
@@ -232,7 +166,7 @@ export function CreateRoomForm({ username }: { username: string }) {
           <button
             type="submit"
             className="btn btn-primary btn-lg"
-            disabled={!agenda.trim() || !criteria.trim() || isPending}
+            disabled={isPending}
           >
             {isPending ? "Opening…" : "Open the room"} <ArrowRight />
           </button>

@@ -70,6 +70,24 @@ export async function signupOrRequestLink(input: unknown): Promise<SignupResult>
   }
 }
 
+/**
+ * Form-action variant: receives FormData and the previous useActionState
+ * value, so it can be passed directly as `<form action={formAction}>`.
+ * The declarative form-action pattern (vs onSubmit + manual call) is more
+ * robust because React 19 wires the form to the action at SSR time — the
+ * form works even before JS hydration completes, instead of silently
+ * falling back to a native GET when hydration is delayed/broken.
+ */
+export async function signupFormAction(
+  _prevState: SignupResult | null,
+  formData: FormData,
+): Promise<SignupResult> {
+  return signupOrRequestLink({
+    email: formData.get("email")?.toString() ?? "",
+    username: formData.get("username")?.toString() ?? "",
+  });
+}
+
 export async function logOut() {
   await clearSessionCookie();
   redirect("/sign-up");

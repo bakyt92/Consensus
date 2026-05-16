@@ -332,6 +332,13 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   border: 0;
 }
 .help-trigger:hover { background: var(--navy); color: var(--cream); }
+/* <details>-based popover: strip the default disclosure marker, keep the
+ * trigger inline, and anchor the absolutely-positioned .popover to the
+ * <details> wrapper. Closed/open is the native [open] attribute. */
+.help-details { display: inline; position: relative; }
+.help-details > summary.help-trigger { list-style: none; cursor: help; }
+.help-details > summary.help-trigger::-webkit-details-marker { display: none; }
+.help-details > summary.help-trigger::marker { content: ""; }
 .popover {
   position: absolute;
   top: calc(100% + 8px); left: 0;
