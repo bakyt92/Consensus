@@ -36,7 +36,7 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 # Serialise deploys: a second push that arrives mid-deploy should wait, not
