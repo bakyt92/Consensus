@@ -46,9 +46,9 @@ export async function transcribeAudio(
   }
 
   const baseUrl = process.env.SLNG_API_URL ?? "https://api.slng.ai";
-  // Deepgram Nova-3 — only STT model currently deployed on the SLNG tier we
-  // have. Handles MediaRecorder's WebM/Opus output.
-  const endpoint = `${baseUrl}/v1/stt/slng/deepgram/nova:3`;
+  // Per docs.slng.ai: Deepgram Nova-3, no /slng/ prefix, field `audio`,
+  // `language` is required.
+  const endpoint = `${baseUrl}/v1/stt/deepgram/nova:3`;
 
   const form = new FormData();
   form.append(
@@ -56,7 +56,7 @@ export async function transcribeAudio(
     new Blob([args.audio as BlobPart], { type: args.mime || "audio/webm" }),
     "audio.webm",
   );
-  if (args.language) form.append("language", args.language);
+  form.append("language", args.language ?? "en");
 
   const res = await fetch(endpoint, {
     method: "POST",
@@ -65,23 +65,24 @@ export async function transcribeAudio(
   });
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
-    throw new Error(`SLNG STT ${res.status}: ${msg.slice(0, 200)}`);
+    throw new Error(`SLNG STT ${res.status}: ${msg.slice(0, 2000)}`);
   }
   const json = (await res.json().catch(() => ({}))) as {
-    text?: string;
-    transcript?: string;
-    duration?: number;
+    results?: {
+      channels?: Array<{
+        alternatives?: Array<{ transcript?: string }>;
+      }>;
+    };
   };
-  const text = json.text ?? json.transcript;
+  const text = json.results?.channels?.[0]?.alternatives?.[0]?.transcript;
   if (typeof text !== "string") {
     throw new Error(
-      `SLNG STT response missing 'text'/'transcript': ${JSON.stringify(json).slice(0, 200)}`,
+      `SLNG STT unexpected response shape: ${JSON.stringify(json).slice(0, 300)}`,
     );
   }
   return {
     text,
     isFinal: true,
-    durationMs: json.duration ? Math.round(json.duration * 1000) : undefined,
     stubbed: false,
   };
 }
