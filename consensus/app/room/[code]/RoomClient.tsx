@@ -327,6 +327,28 @@ export function RoomClient(props: Props) {
                 ></span>{" "}
                 Mediator on
               </span>
+              <button
+                type="button"
+                onClick={toggleVoiceClone}
+                disabled={voiceClonePending}
+                className={"pill" + (!voiceCloneOff ? " ok" : "")}
+                style={{
+                  cursor: "pointer",
+                  border: "1px solid var(--line)",
+                  background: !voiceCloneOff
+                    ? "var(--ok-soft)"
+                    : "transparent",
+                }}
+                title="Your voice may be used for post-meeting Q&A."
+              >
+                {props.voiceCloned
+                  ? voiceCloneOff
+                    ? "Cloning paused (clone exists)"
+                    : "Voice cloning on"
+                  : voiceCloneOff
+                    ? "Voice cloning off"
+                    : "Voice cloning on"}
+              </button>
             </div>
           </div>
 
