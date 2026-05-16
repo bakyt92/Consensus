@@ -45,12 +45,43 @@ export async function transcribeAudio(
     };
   }
 
-  // Real SDK goes here. Expected shape per discussion with SLNG:
-  //   POST {SLNG_API_URL}/transcribe with multipart audio + speaker hints,
-  //   returns { transcript, segments: [{ speakerId, start, end, text }] }.
-  // For multi-speaker meetings we'd pass roomId so SLNG can match its own
-  // diarized speaker IDs back to our participants.
-  throw new Error(
-    "SLNG real integration not yet wired. Drop the SDK call here and remove this throw.",
+  const baseUrl = process.env.SLNG_API_URL ?? "https://api.slng.ai";
+  // Deepgram Nova-3 — only STT model currently deployed on the SLNG tier we
+  // have. Handles MediaRecorder's WebM/Opus output.
+  const endpoint = `${baseUrl}/v1/stt/slng/deepgram/nova:3`;
+
+  const form = new FormData();
+  form.append(
+    "audio",
+    new Blob([args.audio as BlobPart], { type: args.mime || "audio/webm" }),
+    "audio.webm",
   );
+  if (args.language) form.append("language", args.language);
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.SLNG_API_KEY}` },
+    body: form,
+  });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(`SLNG STT ${res.status}: ${msg.slice(0, 200)}`);
+  }
+  const json = (await res.json().catch(() => ({}))) as {
+    text?: string;
+    transcript?: string;
+    duration?: number;
+  };
+  const text = json.text ?? json.transcript;
+  if (typeof text !== "string") {
+    throw new Error(
+      `SLNG STT response missing 'text'/'transcript': ${JSON.stringify(json).slice(0, 200)}`,
+    );
+  }
+  return {
+    text,
+    isFinal: true,
+    durationMs: json.duration ? Math.round(json.duration * 1000) : undefined,
+    stubbed: false,
+  };
 }
