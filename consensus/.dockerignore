@@ -1,0 +1,40 @@
+# dependencies — re-installed inside the image
+node_modules
+.pnpm-store
+
+# build artefacts — produced inside the image
+.next
+out
+build
+*.tsbuildinfo
+next-env.d.ts
+coverage
+
+# env / secrets — provided at runtime via the server's /opt/consensus/.env
+.env
+.env.*
+!.env.example
+
+# local SQLite DB — production uses a mounted volume
+prisma/dev.db
+prisma/dev.db-journal
+prisma/dev.db-shm
+prisma/dev.db-wal
+*.db
+
+# tests + design artefacts — runtime doesn't need them
+tests
+designs
+
+# misc
+.git
+.gitignore
+.github
+.DS_Store
+*.pem
+npm-debug.log*
+.pnpm-debug.log*
+.vercel
+README.md
+BUGS.md
+CLAUDE.md

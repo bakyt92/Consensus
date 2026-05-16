@@ -19,14 +19,32 @@
  *      Prisma client constructed by our module must be able to read it.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, afterAll } from "vitest";
 import { execSync } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
 
+// Pre-warm the prisma singleton against the test DB URL (set by tests/setup.ts).
+// Tests below mutate DATABASE_URL to exercise URL-resolution semantics; if the
+// singleton were lazily created during one of those tests, the global afterEach
+// in tests/setup.ts would try to wipe the wrong DB. Importing here pins the
+// singleton to the test DB before any test runs.
+await import("@/src/lib/prisma");
+
 const projectRoot = path.resolve(import.meta.dirname, "..");
 const dbName = `path-test-${Date.now()}.db`;
 const relativeUrl = `file:./${dbName}`;
+// Captured before any test mutates DATABASE_URL. The global afterEach in
+// tests/setup.ts uses the prisma singleton against this URL — each local
+// test must restore it (and reset the singleton) so wipe runs against the
+// real test DB instead of the per-test relative URL.
+const ORIGINAL_DATABASE_URL = process.env.DATABASE_URL;
+
+afterEach(() => {
+  process.env.DATABASE_URL = ORIGINAL_DATABASE_URL;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).__consensusPrisma = undefined;
+});
 
 afterAll(() => {
   for (const p of [

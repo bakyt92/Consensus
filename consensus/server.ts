@@ -114,6 +114,15 @@ async function attach(ws: WebSocket, roomId: string, userId: string) {
   ws.on("message", () => {});
 }
 
+function parseSpans(raw: string | null): unknown {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 async function sendSnapshot(ws: WebSocket, roomId: string) {
   const [room, msgs, lastSummary] = await Promise.all([
     prisma.room.findUnique({ where: { id: roomId } }),
@@ -143,6 +152,11 @@ async function sendSnapshot(ws: WebSocket, roomId: string) {
           username: m.user?.username ?? null,
           sentAt: m.sentAt.toISOString(),
           seq: m.seq,
+          category: m.category,
+          categoryConfidence: m.categoryConfidence,
+          sentiment: m.sentiment,
+          sentimentConfidence: m.sentimentConfidence,
+          spans: parseSpans(m.spans),
         },
       }),
     );

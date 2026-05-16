@@ -71,6 +71,9 @@ model Room {
   agendaTitle     String
   criteria        String
   maxParticipants Int          @default(8)
+  // One of: none | debate | brainstorm | standup | retro | negotiation.
+  // Stored as String for back-compat with existing rows; validated at the zod boundary.
+  template        String       @default("none")
   status          RoomStatus   @default(PENDING)
   consensus       ConsensusStatus @default(PENDING)
   consensusPercent Int         @default(0)
@@ -119,6 +122,12 @@ model Message {
   filtered  Boolean  @default(false)
   sentAt    DateTime @default(now()) // wall-clock time when received
   seq       Int      // monotonic per-room order (LLM-processing order)
+  // GLiNER classification (set asynchronously after Pioneer on-topic check; null when stub or not yet classified).
+  category            String?
+  categoryConfidence  Float?
+  sentiment           String?  // "positive" | "negative" | "neutral"
+  sentimentConfidence Float?
+  spans               String?  // JSON-encoded GLiNER spans: [{label,text,start,end,confidence}, ...]
   room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 

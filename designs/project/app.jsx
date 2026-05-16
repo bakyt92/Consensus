@@ -6,6 +6,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "startAt": "signup",
   "role": "admin",
   "palette": "civic",
+  "template": "negotiation",
   "voiceModeDefault": false,
   "showFilteredMessages": true
 }/*EDITMODE-END*/;
@@ -34,9 +35,10 @@ function applyPalette(name) {
 }
 
 // Seed room used everywhere
-function seedRoom(adminName) {
+function seedRoom(adminName, template = 'negotiation') {
   return {
     code: 'ENG-237',
+    template,
     agendaTitle: 'Hybrid working policy — 2026 H1',
     agenda: 'Determine a shared minimum-days-in-office expectation across the engineering org, accounting for team rituals, parent schedules, and individual focus needs.',
     criteria: 'All four participants must explicitly agree on (a) a minimum number of in-office days and (b) whether those days are fixed company-wide or chosen per team. The agreement must include a quarterly review clause.',
@@ -84,6 +86,15 @@ function App() {
   // Palette
   useEffectA(() => { applyPalette(tweaks.palette || 'civic'); }, [tweaks.palette]);
 
+  // Template switch — propagate the tweak into the active room so the
+  // center pane re-renders against the new visualization immediately.
+  useEffectA(() => {
+    if (room && tweaks.template && tweaks.template !== room.template) {
+      setRoom({ ...room, template: tweaks.template });
+    }
+    // eslint-disable-next-line
+  }, [tweaks.template]);
+
   // ---- screen transitions
   function handleSignup({ email, username }) {
     setUser({ email, username });
@@ -99,9 +110,9 @@ function App() {
     setRoom(r);
     setScreen('room');
   }
-  function handleCreated({ agenda, criteria, maxParticipants }) {
+  function handleCreated({ template, agenda, criteria, maxParticipants }) {
     const code = 'C-' + Math.floor(1000 + Math.random() * 8999);
-    const seeded = seedRoom(user.username || 'Maya');
+    const seeded = seedRoom(user.username || 'Maya', template || 'debate');
     seeded.agenda = agenda;
     seeded.criteria = criteria;
     // Pull a quick title from first non-empty line of agenda
@@ -181,6 +192,18 @@ function App() {
         </TweakSection>
 
         <TweakSection label="Room behaviour">
+          <TweakSelect
+            label="Template (live)"
+            value={tweaks.template}
+            onChange={(v) => setTweak('template', v)}
+            options={[
+              { value: 'debate',      label: 'Debate' },
+              { value: 'brainstorm',  label: 'Brainstorm' },
+              { value: 'standup',     label: 'Stand-up' },
+              { value: 'retro',       label: 'Retrospective' },
+              { value: 'negotiation', label: 'Negotiation / Mediation' },
+            ]}
+          />
           <TweakToggle
             label="Voice mode default (auto-TTS)"
             value={tweaks.voiceModeDefault}

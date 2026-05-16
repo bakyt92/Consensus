@@ -10,6 +10,9 @@ export default defineConfig({
     poolOptions: {
       forks: { singleFork: true },
     },
+    // Serial file execution — multiple e2e specs that each spawn `next dev`
+    // can't share the project lock, so we run files one-at-a-time.
+    fileParallelism: false,
     testTimeout: 20000,
     hookTimeout: 60000,
   },

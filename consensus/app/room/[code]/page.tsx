@@ -42,6 +42,7 @@ export default async function RoomPage({
       agenda={room.agenda}
       agendaTitle={room.agendaTitle}
       criteria={room.criteria}
+      template={room.template}
       isAdmin={isAdmin}
       me={{ id: user.id, username: user.username }}
       adminName={

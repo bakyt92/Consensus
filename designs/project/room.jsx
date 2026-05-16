@@ -24,9 +24,11 @@ function makeInitial(room) {
       },
       {
         id: 'med-0', role: 'mediator', name: 'Mediator', text: `Welcome. I'll keep this on track. The agenda is **${room.agendaTitle.toLowerCase()}**, and we close when all of you agree on (a) a minimum number of in-office days and (b) whether those days are fixed company-wide or chosen per team. Open the floor: what's your starting position?`, time: timeFromOffset(8),
+        label: 'synthesis', sentiment: 'neutral',
       },
       {
         id: 'p2-0', role: 'them', name: 'Jordan', text: "Honestly I just want to know what to tell my team by next Monday.", time: timeFromOffset(7),
+        label: 'question', sentiment: 'neutral',
       },
     ],
     summary: [
@@ -48,12 +50,12 @@ const TURNS = [
     ],
     apply(pick) {
       const newMsgs = [
-        { id: 'me-1', role: 'me', name: 'You · Maya', text: pick.text, time: timeFromOffset(6) },
-        { id: 'p2-1', role: 'them', name: 'Jordan', text: "Two works. Three is too much for the parents on my team — school pickup is real.", time: timeFromOffset(5) },
+        { id: 'me-1', role: 'me', name: 'You · Maya', text: pick.text, time: timeFromOffset(6), label: 'position', sentiment: 'neutral' },
+        { id: 'p2-1', role: 'them', name: 'Jordan', text: "Two works. Three is too much for the parents on my team — school pickup is real.", time: timeFromOffset(5), label: 'concession', sentiment: 'positive' },
         { id: 'flt-1', role: 'filtered', name: 'Jordan', text: "(off-topic message hidden by mediator: an aside about the football last night)", time: timeFromOffset(5) },
-        { id: 'p3-1', role: 'them', name: 'Priya', text: "I'm on two, but Mondays and Fridays shouldn't be the mandatory ones — attendance is always low anyway.", time: timeFromOffset(5) },
-        { id: 'p4-1', role: 'them', name: 'Sam', text: "+1 to two days. I don't care which two as long as it's predictable.", time: timeFromOffset(4) },
-        { id: 'med-1', role: 'mediator', name: 'Mediator', text: "Hearing strong alignment on **two days minimum**. Three of you mention flexibility on *which* days. Open question for the room: should those two days be **fixed company-wide**, **chosen per team**, or **selected per individual**?", time: timeFromOffset(4) },
+        { id: 'p3-1', role: 'them', name: 'Priya', text: "I'm on two, but Mondays and Fridays shouldn't be the mandatory ones — attendance is always low anyway.", time: timeFromOffset(5), label: 'objection', sentiment: 'negative' },
+        { id: 'p4-1', role: 'them', name: 'Sam', text: "+1 to two days. I don't care which two as long as it's predictable.", time: timeFromOffset(4), label: 'position', sentiment: 'positive' },
+        { id: 'med-1', role: 'mediator', name: 'Mediator', text: "Hearing strong alignment on **two days minimum**. Three of you mention flexibility on *which* days. Open question for the room: should those two days be **fixed company-wide**, **chosen per team**, or **selected per individual**?", time: timeFromOffset(4), label: 'synthesis', sentiment: 'neutral' },
       ];
       const newSummary = [
         { heading: 'Agenda', kind: 'body', body: this._agenda },
@@ -83,11 +85,11 @@ const TURNS = [
     ],
     apply(pick) {
       const newMsgs = [
-        { id: 'me-2', role: 'me', name: 'You · Maya', text: pick.text, time: timeFromOffset(3) },
-        { id: 'p4-2', role: 'them', name: 'Sam', text: "Per-team makes sense — we already have different cadences. Platform syncs Tue/Thu, growth syncs Wed.", time: timeFromOffset(3) },
-        { id: 'p2-2', role: 'them', name: 'Jordan', text: "Per-team. Each manager confirms with the group, posts it in #people-ops.", time: timeFromOffset(2) },
-        { id: 'p3-2', role: 'them', name: 'Priya', text: "Per-team works for me, as long as the choice is documented somewhere shared, not just verbal.", time: timeFromOffset(2) },
-        { id: 'med-2', role: 'mediator', name: 'Mediator', text: "Strong alignment: **two days, chosen per team, documented in #people-ops.** One open thread for the criteria: when do we revisit this? The agenda calls for a quarterly review clause.", time: timeFromOffset(2) },
+        { id: 'me-2', role: 'me', name: 'You · Maya', text: pick.text, time: timeFromOffset(3), label: 'position', sentiment: 'neutral' },
+        { id: 'p4-2', role: 'them', name: 'Sam', text: "Per-team makes sense — we already have different cadences. Platform syncs Tue/Thu, growth syncs Wed.", time: timeFromOffset(3), label: 'position', sentiment: 'positive' },
+        { id: 'p2-2', role: 'them', name: 'Jordan', text: "Per-team. Each manager confirms with the group, posts it in #people-ops.", time: timeFromOffset(2), label: 'concession', sentiment: 'positive' },
+        { id: 'p3-2', role: 'them', name: 'Priya', text: "Per-team works for me, as long as the choice is documented somewhere shared, not just verbal.", time: timeFromOffset(2), label: 'concession', sentiment: 'positive' },
+        { id: 'med-2', role: 'mediator', name: 'Mediator', text: "Strong alignment: **two days, chosen per team, documented in #people-ops.** One open thread for the criteria: when do we revisit this? The agenda calls for a quarterly review clause.", time: timeFromOffset(2), label: 'synthesis', sentiment: 'neutral' },
       ];
       const newSummary = [
         { heading: 'Agenda', kind: 'body', body: this._agenda },
@@ -126,11 +128,11 @@ const TURNS = [
     ],
     apply(pick) {
       const newMsgs = [
-        { id: 'me-3', role: 'me', name: 'You · Maya', text: pick.text, time: timeFromOffset(1) },
-        { id: 'p2-3', role: 'them', name: 'Jordan', text: "Quarterly works. First review end of Q1.", time: timeFromOffset(1) },
-        { id: 'p3-3', role: 'them', name: 'Priya', text: "Agreed. Quarterly with the option to call an emergency review.", time: timeFromOffset(0) },
-        { id: 'p4-3', role: 'them', name: 'Sam', text: "Yep. Quarterly. Done.", time: timeFromOffset(0) },
-        { id: 'med-3', role: 'mediator', name: 'Mediator', text: "✓ All four participants now align. Recording the agreement: (a) **two days minimum** in office, (b) **chosen per team** and posted in #people-ops, (c) **quarterly review** with an emergency-review option. **Evaluation criteria are met. Consensus reached.**", time: timeFromOffset(0), tts: true },
+        { id: 'me-3', role: 'me', name: 'You · Maya', text: pick.text, time: timeFromOffset(1), label: 'position', sentiment: 'neutral' },
+        { id: 'p2-3', role: 'them', name: 'Jordan', text: "Quarterly works. First review end of Q1.", time: timeFromOffset(1), label: 'concession', sentiment: 'positive' },
+        { id: 'p3-3', role: 'them', name: 'Priya', text: "Agreed. Quarterly with the option to call an emergency review.", time: timeFromOffset(0), label: 'concession', sentiment: 'positive' },
+        { id: 'p4-3', role: 'them', name: 'Sam', text: "Yep. Quarterly. Done.", time: timeFromOffset(0), label: 'concession', sentiment: 'positive' },
+        { id: 'med-3', role: 'mediator', name: 'Mediator', text: "✓ All four participants now align. Recording the agreement: (a) **two days minimum** in office, (b) **chosen per team** and posted in #people-ops, (c) **quarterly review** with an emergency-review option. **Evaluation criteria are met. Consensus reached.**", time: timeFromOffset(0), tts: true, label: 'synthesis', sentiment: 'positive' },
       ];
       const newSummary = [
         { heading: 'Agenda', kind: 'body', body: this._agenda },
@@ -206,16 +208,173 @@ function ConsensusBar({ pct, threshold = 80, met }) {
   );
 }
 
-function ParticipantRow({ p, isYou }) {
+function ParticipantRow({ p, isYou, onClick }) {
   return (
-    <div className="p-row">
+    <div className={'p-row' + (onClick ? ' clickable' : '')} onClick={onClick}>
       <div className={'avatar' + (isYou ? ' you' : '')}>{p.initials}</div>
-      <div style={{minWidth: 0}}>
+      <div style={{minWidth: 0, flex: 1}}>
         <div className="p-name">{p.name}{isYou ? ' · you' : ''}</div>
         <div className="p-sub">{p.role}</div>
       </div>
       <span className={'p-bullet ' + (p.state === 'thinking' ? 'thinking' : p.state === 'away' ? 'away' : '')}></span>
+      {onClick && (
+        <span style={{color: 'var(--muted-2)', marginLeft: 6, display: 'flex', alignItems: 'center'}}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M9 6l6 6-6 6"/>
+          </svg>
+        </span>
+      )}
     </div>
+  );
+}
+
+// ============================================================
+// PARTICIPANT INSPECTOR (slide-in drawer)
+// ============================================================
+function ParticipantInspector({ participant, messages, template, onClose }) {
+  const open = !!participant;
+
+  // Close on escape
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [open, onClose]);
+
+  // Aggregate the participant's messages
+  const myMessages = participant
+    ? messages.filter(m =>
+        (m.role === 'me' && participant.isYou) ||
+        (m.role === 'them' && m.name === participant.name) ||
+        (m.role === 'mediator' && participant.id === 'mediator')
+      )
+    : [];
+
+  // Label histogram — use the current template's label set as the
+  // canonical order so empty buckets still show as zero rows.
+  const tpl = window.TEMPLATES?.[template] || window.TEMPLATES?.negotiation;
+  const labelSet = tpl?.labels || [];
+  const counts = {};
+  labelSet.forEach(l => counts[l] = 0);
+  myMessages.forEach(m => {
+    if (m.label) counts[m.label] = (counts[m.label] || 0) + 1;
+  });
+  const maxCount = Math.max(1, ...Object.values(counts));
+
+  // Sentiment row
+  const sentCounts = { positive: 0, negative: 0, neutral: 0 };
+  myMessages.forEach(m => {
+    const s = m.sentiment || 'neutral';
+    if (sentCounts[s] != null) sentCounts[s]++;
+  });
+
+  return (
+    <>
+      <div className={'inspector-backdrop' + (open ? ' open' : '')} onClick={onClose}></div>
+      <aside className={'inspector-drawer' + (open ? ' open' : '')} aria-hidden={!open}>
+        {participant && (
+          <>
+            <div className="inspector-head">
+              <div className="row" style={{'--gap': '14px'}}>
+                <div className={'avatar lg' + (participant.isYou ? ' you' : '')}>{participant.initials}</div>
+                <div style={{flex: 1, minWidth: 0}}>
+                  <div className="label">PARTICIPANT</div>
+                  <div style={{fontWeight: 700, fontSize: 20, letterSpacing: '-0.02em', marginTop: 2}}>
+                    {participant.name}{participant.isYou ? ' · you' : ''}
+                  </div>
+                  <div className="label" style={{marginTop: 4, fontSize: 10}}>
+                    {participant.isYou ? 'FACILITATOR · ADMIN' : 'PARTICIPANT'} · {participant.role.toUpperCase()}
+                  </div>
+                </div>
+                <button className="inspector-close" onClick={onClose} aria-label="Close">
+                  <Icon.Close/>
+                </button>
+              </div>
+              <div className="row" style={{'--gap': '20px'}}>
+                <div>
+                  <div className="num" style={{fontSize: 22}}>{myMessages.length}</div>
+                  <div className="label" style={{fontSize: 9}}>CONTRIBUTIONS</div>
+                </div>
+                <div>
+                  <div className="num" style={{fontSize: 22}}>{Object.values(counts).filter(c => c > 0).length}</div>
+                  <div className="label" style={{fontSize: 9}}>LABELS USED</div>
+                </div>
+                <div>
+                  <div className="num" style={{fontSize: 22, color: sentCounts.negative > sentCounts.positive ? 'var(--rust)' : 'var(--navy)'}}>
+                    {sentCounts.positive + sentCounts.negative === 0 ? '—' : Math.round(100 * sentCounts.positive / (sentCounts.positive + sentCounts.negative)) + '%'}
+                  </div>
+                  <div className="label" style={{fontSize: 9}}>POSITIVE LEAN</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="inspector-body">
+              {/* LABEL HISTOGRAM */}
+              <div className="row" style={{'--gap': '10px', marginBottom: 12}}>
+                <span className="label">LABEL DISTRIBUTION</span>
+                <hr className="rule" style={{flex: 1}}/>
+              </div>
+              <div className="histogram">
+                {labelSet.map(l => (
+                  <div key={l} className="hrow">
+                    <span className="hlabel">{l}</span>
+                    <div className="hbar">
+                      <div className="hfill" style={{width: (counts[l] / maxCount * 100) + '%', opacity: counts[l] ? 1 : 0.2}}></div>
+                    </div>
+                    <span className="hcount" style={{color: counts[l] ? 'var(--ink)' : 'var(--muted-2)'}}>{counts[l]}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* SENTIMENT */}
+              <div className="row" style={{'--gap': '10px', marginTop: 28, marginBottom: 12}}>
+                <span className="label">SENTIMENT</span>
+                <hr className="rule" style={{flex: 1}}/>
+              </div>
+              <div className="sent-row">
+                {[
+                  { key: 'positive', label: 'Positive' },
+                  { key: 'neutral',  label: 'Neutral'  },
+                  { key: 'negative', label: 'Negative' },
+                ].map(s => (
+                  <div key={s.key} className="sent-cell">
+                    <div style={{display: 'flex', alignItems: 'center', marginBottom: 6}}>
+                      <span className="sent-dot" style={{background: SENTIMENT[s.key].dot}}></span>
+                      <span className="label" style={{fontSize: 9}}>{s.label}</span>
+                    </div>
+                    <div className="num" style={{fontSize: 22, color: 'var(--ink)'}}>{sentCounts[s.key]}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* RECENT MESSAGES */}
+              <div className="row" style={{'--gap': '10px', marginTop: 28, marginBottom: 12}}>
+                <span className="label">RECENT MESSAGES · NEWEST FIRST</span>
+                <hr className="rule" style={{flex: 1}}/>
+              </div>
+              {myMessages.length === 0 ? (
+                <div style={{padding: '24px 14px', textAlign: 'center', color: 'var(--muted)', fontStyle: 'italic', fontFamily: 'Newsreader', fontSize: 14}}>
+                  No contributions yet in this session.
+                </div>
+              ) : (
+                [...myMessages].reverse().map(m => (
+                  <div key={m.id} className="insp-msg">
+                    <div className="insp-meta">
+                      <LabelChip label={m.label || 'untagged'} sentiment={m.sentiment || 'neutral'}/>
+                      <span className="insp-time" style={{marginLeft: 'auto'}}>{m.time}</span>
+                    </div>
+                    <div className="insp-text">
+                      {m.text.replace(/\*\*/g, '')}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+      </aside>
+    </>
   );
 }
 
@@ -280,6 +439,11 @@ function ChatMessage({ m, onSpeak, speakingId }) {
           )}
         </div>
         <div className="msg-text">{renderText(m.text)}</div>
+        {m.label && (
+          <div className="chip-row">
+            <LabelChip label={m.label} sentiment={m.sentiment || 'neutral'} dark={isMediator}/>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -300,6 +464,12 @@ function Room({ user, room, isAdmin, voiceMode, setVoiceMode, onCloseMeeting, on
   const [speakingId, setSpeakingId] = useState(null);
   const [kebabOpen, setKebabOpen] = useState(false);
   const [participantsState, setParticipantsState] = useState(room.participants);
+  // template + inspector state added in the template/inspector pass
+  const [centerTab, setCenterTab] = useState('live'); // 'live' (template viz) | 'minutes'
+  const [inspectorId, setInspectorId] = useState(null);
+  const inspectorParticipant = inspectorId ? participantsState.find(p => p.id === inspectorId) : null;
+  const template = room.template || 'negotiation';
+  const Viz = window.TEMPLATES?.[template]?.Visualization || null;
 
   // bind room context to turn data so apply() can reference original agenda/criteria
   TURNS.forEach(t => { t._agenda = room.agenda; t._criteria = room.criteria; });
@@ -625,9 +795,32 @@ function Room({ user, room, isAdmin, voiceMode, setVoiceMode, onCloseMeeting, on
           </div>
         </aside>
 
-        {/* ----- LIVE SUMMARY (center) ----- */}
+        {/* ----- CENTER (tabbed: live template view + minutes) ----- */}
         <main className="room-center">
-          <div className="summary-doc">
+          <div className="center-tabs">
+            <button
+              className={'center-tab' + (centerTab === 'live' ? ' active' : '')}
+              onClick={() => setCenterTab('live')}
+            >
+              Live view
+              {window.TEMPLATES?.[template] && (
+                <span className="count">{window.TEMPLATES[template].name}</span>
+              )}
+            </button>
+            <button
+              className={'center-tab' + (centerTab === 'minutes' ? ' active' : '')}
+              onClick={() => setCenterTab('minutes')}
+            >
+              Minutes
+              <span className="count">§ {summary.length}</span>
+            </button>
+            <div style={{flex: 1}}></div>
+            <span className="label" style={{alignSelf: 'center', paddingRight: 4, fontSize: 10}}>
+              ROOM · {room.code}
+            </span>
+          </div>
+
+          <div className="center-body">
 
             {meetingStatus === 'consensus' && (
               <div className="doc-banner consensus-met">
@@ -648,55 +841,66 @@ function Room({ user, room, isAdmin, voiceMode, setVoiceMode, onCloseMeeting, on
 
             <ConsensusBar pct={consensus} met={consensusMet}/>
 
-            <div className="doc-head" style={{marginTop: 28}}>
-              <div className="label">LIVE SUMMARY · MARKDOWN</div>
-              <h1 className="doc-title">{room.agendaTitle}</h1>
-              <div className="doc-meta">
-                <div>
-                  <span className="label">ROOM</span>
-                  <span className="mono" style={{fontWeight: 600, fontSize: 14}}>{room.code}</span>
-                </div>
-                <div>
-                  <span className="label">FACILITATOR</span>
-                  <span style={{fontWeight: 600, fontSize: 14}}>{room.adminName}</span>
-                </div>
-                <div>
-                  <span className="label">STATUS</span>
-                  <span style={{fontWeight: 600, fontSize: 14, color: consensusMet ? 'var(--ok)' : 'var(--rust)'}}>
-                    {consensusMet ? 'Consensus reached' : 'In progress'}
-                  </span>
-                </div>
+            {centerTab === 'live' && Viz ? (
+              <div style={{marginTop: 32}}>
+                <Viz/>
               </div>
-            </div>
+            ) : (
+              <div className="summary-doc" style={{maxWidth: 720, padding: '32px 0 40px'}}>
+                <div className="doc-head">
+                  <div className="label">LIVE SUMMARY · MARKDOWN</div>
+                  <h1 className="doc-title">{room.agendaTitle}</h1>
+                  <div className="doc-meta">
+                    <div>
+                      <span className="label">ROOM</span>
+                      <span className="mono" style={{fontWeight: 600, fontSize: 14}}>{room.code}</span>
+                    </div>
+                    <div>
+                      <span className="label">FACILITATOR</span>
+                      <span style={{fontWeight: 600, fontSize: 14}}>{room.adminName}</span>
+                    </div>
+                    <div>
+                      <span className="label">STATUS</span>
+                      <span style={{fontWeight: 600, fontSize: 14, color: consensusMet ? 'var(--ok)' : 'var(--rust)'}}>
+                        {consensusMet ? 'Consensus reached' : 'In progress'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-            {summary.map((s, i) => (
-              <section key={i + '-' + s.heading}>
-                <h3 className="s-head">
-                  <span className="s-num">§ {String(i + 1).padStart(2, '0')}</span>
-                  {s.heading}
-                </h3>
-                {s.kind === 'list' ? (
-                  <ul className="s-list">
-                    {s.items.map((it, j) => (
-                      <li key={j}>{it.role && <strong>{it.role}: </strong>}{it.text}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="s-body">{s.body}</p>
-                )}
-                {s.agreement && <div className="agree-line">— {s.agreement}</div>}
-              </section>
-            ))}
+                {summary.map((s, i) => (
+                  <section key={i + '-' + s.heading}>
+                    <h3 className="s-head">
+                      <span className="s-num">§ {String(i + 1).padStart(2, '0')}</span>
+                      {s.heading}
+                    </h3>
+                    {s.kind === 'list' ? (
+                      <ul className="s-list">
+                        {s.items.map((it, j) => (
+                          <li key={j}>{it.role && <strong>{it.role}: </strong>}{it.text}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="s-body">{s.body}</p>
+                    )}
+                    {s.agreement && <div className="agree-line">— {s.agreement}</div>}
+                  </section>
+                ))}
+              </div>
+            )}
 
           </div>
         </main>
 
         {/* ----- PARTICIPANTS (right) ----- */}
         <aside className="room-right">
-          <div className="label" style={{marginBottom: 10}}>PARTICIPANTS · {participantsState.length}</div>
+          <div className="row" style={{justifyContent: 'space-between', marginBottom: 10}}>
+            <span className="label">PARTICIPANTS · {participantsState.length}</span>
+            <span className="label" style={{fontSize: 9, opacity: 0.7}}>TAP TO INSPECT</span>
+          </div>
           <div className="card flat" style={{padding: 4, border: 0}}>
             {participantsState.map(p => (
-              <ParticipantRow key={p.id} p={p} isYou={p.isYou}/>
+              <ParticipantRow key={p.id} p={p} isYou={p.isYou} onClick={() => setInspectorId(p.id)}/>
             ))}
           </div>
 
@@ -746,6 +950,13 @@ function Room({ user, room, isAdmin, voiceMode, setVoiceMode, onCloseMeeting, on
         </aside>
 
       </div>
+
+      <ParticipantInspector
+        participant={inspectorParticipant}
+        messages={messages}
+        template={template}
+        onClose={() => setInspectorId(null)}
+      />
     </div>
   );
 }

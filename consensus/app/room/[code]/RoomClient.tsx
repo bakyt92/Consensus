@@ -18,18 +18,22 @@ import { Markdown, renderInline } from "@/src/components/Markdown";
 import { useRoomChannel, type RoomMessage } from "@/src/components/useRoomChannel";
 import { useVoiceCapture } from "@/src/components/useVoiceCapture";
 import { useVoicePlayback } from "@/src/components/useVoicePlayback";
+import { MessageBadge } from "@/src/components/MessageBadge";
+import { ClassificationPanel } from "@/src/components/ClassificationPanel";
 import {
   sendMessage,
   lockRoom,
   requestCloseMeeting,
   setVoiceCloneOptOutAction,
 } from "@/src/lib/room-actions";
+import { getTemplate } from "@/src/lib/templates";
 
 type Props = {
   code: string;
   agenda: string;
   agendaTitle: string;
   criteria: string;
+  template: string;
   isAdmin: boolean;
   me: { id: string; username: string };
   adminName: string;
@@ -50,10 +54,15 @@ export function RoomClient(props: Props) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [kebabOpen, setKebabOpen] = useState(false);
+  const [inspectorUserId, setInspectorUserId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const [voiceCloneOff, setVoiceCloneOff] = useState(props.voiceOptOut);
   const [voiceClonePending, startVoiceCloneTransition] = useTransition();
   const feedRef = useRef<HTMLDivElement | null>(null);
+  const template = getTemplate(props.template);
+  const hasTemplate = template.labels.length > 0;
+  const inspectorParticipant =
+    participants.find((p) => p.userId === inspectorUserId) ?? null;
 
   function toggleVoiceClone() {
     const next = !voiceCloneOff;
@@ -366,6 +375,7 @@ export function RoomClient(props: Props) {
                 meId={props.me.id}
                 roomCode={props.code}
                 onError={setError}
+                showBadge={hasTemplate}
               />
             ))}
             {consensusMet && status !== "CLOSED" && (
@@ -574,27 +584,58 @@ export function RoomClient(props: Props) {
             PARTICIPANTS · {participants.length}
           </div>
           <div className="card flat" style={{ padding: 4, border: 0 }}>
-            {participants.map((p) => (
-              <div key={p.userId} className="p-row">
-                <div
-                  className={
-                    "avatar" + (p.userId === props.me.id ? " you" : "")
+            {participants.map((p) => {
+              const interactive = hasTemplate;
+              return (
+                <button
+                  key={p.userId}
+                  type="button"
+                  className={"p-row" + (interactive ? " clickable" : "")}
+                  onClick={() =>
+                    interactive ? setInspectorUserId(p.userId) : undefined
+                  }
+                  disabled={!interactive}
+                  aria-label={
+                    interactive
+                      ? `Inspect ${p.username}'s contributions`
+                      : undefined
                   }
                 >
-                  {p.username[0]?.toUpperCase() ?? "?"}
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div className="p-name">
-                    {p.username}
-                    {p.userId === props.me.id ? " · you" : ""}
+                  <div
+                    className={
+                      "avatar" + (p.userId === props.me.id ? " you" : "")
+                    }
+                  >
+                    {p.username[0]?.toUpperCase() ?? "?"}
                   </div>
-                  <div className="p-sub">
-                    {p.role === "admin" ? "Facilitator · Admin" : "Participant"}
+                  <div style={{ minWidth: 0, flex: 1, textAlign: "left" }}>
+                    <div className="p-name">
+                      {p.username}
+                      {p.userId === props.me.id ? " · you" : ""}
+                    </div>
+                    <div className="p-sub">
+                      {p.role === "admin" ? "Facilitator · Admin" : "Participant"}
+                    </div>
                   </div>
-                </div>
-                <span className="p-bullet"></span>
-              </div>
-            ))}
+                  <span className="p-bullet"></span>
+                  {interactive && (
+                    <span className="p-chevron" aria-hidden="true">
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                      >
+                        <path d="M9 6l6 6-6 6" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           <hr className="rule" style={{ margin: "24px 0 20px" }} />
@@ -634,6 +675,14 @@ export function RoomClient(props: Props) {
           </p>
         </aside>
       </div>
+
+      <ClassificationPanel
+        participant={inspectorParticipant}
+        messages={messages}
+        templateKey={props.template}
+        isYouId={props.me.id}
+        onClose={() => setInspectorUserId(null)}
+      />
     </div>
   );
 }
@@ -650,11 +699,13 @@ function ChatBubble({
   meId,
   roomCode,
   onError,
+  showBadge,
 }: {
   m: RoomMessage;
   meId: string;
   roomCode: string;
   onError: (msg: string) => void;
+  showBadge: boolean;
 }) {
   const [researching, setResearching] = useState(false);
 
@@ -768,6 +819,15 @@ function ChatBubble({
           className="msg-text"
           dangerouslySetInnerHTML={{ __html: renderInline(m.text) }}
         />
+        {showBadge && m.role === "user" && (m.category || m.sentiment) && (
+          <div className="chip-row">
+            <MessageBadge
+              category={m.category}
+              sentiment={m.sentiment}
+              dark={false}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

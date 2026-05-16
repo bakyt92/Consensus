@@ -25,7 +25,16 @@ export type WsEvent =
     }
   | { type: "status"; status: "PENDING" | "OPEN" | "LOCKED" | "STOPPING" | "CLOSED" }
   | { type: "participants"; participants: Participant[] }
+  | { type: "voiceCloned"; userId: string; voiceId: string }
   | { type: "closed"; redirectTo: string };
+
+export type WsSpan = {
+  label: string;
+  text: string;
+  start: number;
+  end: number;
+  confidence: number;
+};
 
 export type WsMessage = {
   id: string;
@@ -36,6 +45,12 @@ export type WsMessage = {
   username: string | null;
   sentAt: string;
   seq: number;
+  // GLiNER classification — null until classified (or always null for stub mode + system/mediator messages).
+  category: string | null;
+  categoryConfidence: number | null;
+  sentiment: string | null; // "positive" | "negative" | "neutral"
+  sentimentConfidence: number | null;
+  spans: WsSpan[] | null;
 };
 
 export type Participant = {
