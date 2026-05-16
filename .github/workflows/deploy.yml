@@ -1,0 +1,199 @@
+# Build + push the Consensus image to GHCR, then ssh to rk9-vp9.online and
+# pull/restart the compose stack. Pattern lifted from
+# megadrive-deploy/docs/consensus-onboarding.md — keep them in sync.
+#
+# Required GitHub secrets (one-time setup by a maintainer):
+#
+#   SSH access:
+#     SSH_PRIVATE_KEY  — ed25519 key whose public half is in the server's
+#                        ~consensus/.ssh/authorized_keys
+#     SSH_HOST         — 178.104.83.194 (ask ops to confirm)
+#     SSH_PORT         — 1025 (the server's SSH is NOT on 22)
+#     SSH_USER         — consensus
+#     SSH_HOST_KEY     — output of `ssh-keyscan -t ed25519 -p 1025 178.104.83.194`
+#                        (the line beginning with "ssh-ed25519 AAAA…").
+#                        Pinning prevents MITM during scp/ssh.
+#
+#   App runtime secrets (composed into /opt/consensus/.env by "Compose env file"):
+#     AUTH_SECRET      — ≥16-char string used to sign the session JWT.
+#     OPENAI_API_KEY   — required for the mediator turn.
+#     GRADIUM_API_KEY  — optional (TTS).
+#     PIONEER_API_KEY  — optional (on-topic + GLiNER classifier).
+#     SLNG_API_KEY     — optional (diarized STT). NOTE: it's S-L-N-G,
+#                        not S-N-L-G — the app reads SLNG_API_KEY.
+#     RESEND_API_KEY   — required to actually deliver magic-link emails.
+#     RESEND_FROM      — the verified sender, e.g. "Consensus <no-reply@…>".
+#
+# GITHUB_TOKEN is provided automatically and is used to push to GHCR.
+#
+# DATABASE_URL, APP_ORIGIN, PORT, NODE_ENV are pinned in docker-compose.yml
+# so they're not in this secret list.
+#
+# Until DNS, SSH user, and these secrets are provisioned, this workflow will
+# fail at the "Sync env file" or "Pull + restart" step with a clear error.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Serialise deploys: a second push that arrives mid-deploy should wait, not
+# clobber an in-flight rollout.
+concurrency:
+  group: consensus-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute image tag
+        id: meta
+        run: echo "tag=$(date -u +%Y-%m-%d).${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./consensus
+          file: ./consensus/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/bakyt92/consensus:${{ steps.meta.outputs.tag }}
+            ghcr.io/bakyt92/consensus:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to rk9-vp9.online
+    needs: build
+    runs-on: ubuntu-latest
+    # Wire to a GH "production" environment if you want manual gating —
+    # remove this line otherwise.
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write SSH key & pinned host key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_HOST_KEY: ${{ secrets.SSH_HOST_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Pin host key — do NOT use ssh-keyscan in production runners.
+          printf '[%s]:%s %s\n' "$SSH_HOST" "$SSH_PORT" "$SSH_HOST_KEY" \
+            > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Compose env file
+        env:
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GRADIUM_API_KEY: ${{ secrets.GRADIUM_API_KEY }}
+          PIONEER_API_KEY: ${{ secrets.PIONEER_API_KEY }}
+          SLNG_API_KEY: ${{ secrets.SLNG_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+        run: |
+          set -euo pipefail
+          umask 077
+          # Build the .env file from individual GH secrets. Quoting values with
+          # single quotes keeps any odd characters (=, $, spaces) intact.
+          {
+            printf "AUTH_SECRET=%s\n"      "$AUTH_SECRET"
+            printf "OPENAI_API_KEY=%s\n"   "$OPENAI_API_KEY"
+            printf "GRADIUM_API_KEY=%s\n"  "$GRADIUM_API_KEY"
+            printf "PIONEER_API_KEY=%s\n"  "$PIONEER_API_KEY"
+            printf "SLNG_API_KEY=%s\n"     "$SLNG_API_KEY"
+            printf "RESEND_API_KEY=%s\n"   "$RESEND_API_KEY"
+            printf "RESEND_FROM=%s\n"      "$RESEND_FROM"
+          } > .env.deploy
+          # Fail loudly if AUTH_SECRET or OPENAI_API_KEY is missing — without
+          # these the server boots but every action 500s.
+          for var in AUTH_SECRET OPENAI_API_KEY; do
+            if ! grep -q "^${var}=." .env.deploy; then
+              echo "::error::Missing required secret: $var" >&2
+              exit 1
+            fi
+          done
+
+      - name: Sync env file
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          set -euo pipefail
+          scp -P "$SSH_PORT" .env.deploy \
+            "$SSH_USER@$SSH_HOST:/opt/consensus/.env"
+          shred -u .env.deploy 2>/dev/null || rm -f .env.deploy
+
+      - name: Sync compose file
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          set -euo pipefail
+          scp -P "$SSH_PORT" docker-compose.yml \
+            "$SSH_USER@$SSH_HOST:/opt/consensus/docker-compose.yml"
+
+      - name: Log in to GHCR on the server & pull
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          # The image is private until you flip its GHCR visibility. Logging in
+          # on the server lets `compose pull` succeed either way. If you make
+          # the package public this step is a no-op.
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "echo '$GHCR_TOKEN' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "\
+            cd /opt/consensus && \
+            export IMAGE_TAG='$IMAGE_TAG' && \
+            docker compose -p consensus pull && \
+            docker compose -p consensus up -d --remove-orphans"
+
+      - name: Smoke test /health
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if curl -fsS https://consensus.rk9-vp9.online/health > /tmp/health.out; then
+              echo "OK (attempt $i):"
+              cat /tmp/health.out
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Smoke test failed after 60s" >&2
+          exit 1

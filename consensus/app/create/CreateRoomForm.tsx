@@ -3,6 +3,7 @@
 import { useActionState, useRef } from "react";
 import { createRoomFormAction } from "@/src/lib/room-actions";
 import { ArrowRight, Eye } from "@/src/components/Icon";
+import { TEMPLATES, TEMPLATE_ORDER } from "@/src/lib/templates";
 
 const EXAMPLE_AGENDA =
   "Hybrid working policy — 2026 H1\n\nDetermine a shared minimum-days-in-office expectation across the engineering org, accounting for team rituals, parent schedules, and individual focus needs.";
@@ -47,6 +48,63 @@ export function CreateRoomForm({ username }: { username: string }) {
         className="stack"
         style={{ ["--gap" as never]: "32px" }}
       >
+        <fieldset className="template-picker">
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <legend className="field-label" style={{ marginBottom: 0 }}>
+              Meeting template
+            </legend>
+            <details className="help-details">
+              <summary className="help-trigger" aria-label="What do templates change?">
+                ?
+              </summary>
+              <div className="popover" style={{ top: 32, left: 0 }}>
+                <div className="label on-navy">TEMPLATES</div>
+                Templates change the{" "}
+                <strong style={{ color: "var(--cream)" }}>shape of the live summary</strong>, the
+                label set the mediator uses, and the chip under each chat message. The
+                conversation itself works the same way regardless.
+              </div>
+            </details>
+          </div>
+          <p
+            className="body"
+            style={{ margin: "4px 0 14px", fontSize: 13, color: "var(--muted)" }}
+          >
+            Pick the shape this meeting wants to take. The classifier and right pane adapt.
+          </p>
+          <div className="template-grid">
+            {TEMPLATE_ORDER.map((key) => {
+              const t = TEMPLATES[key];
+              const isDefault = key === "debate";
+              return (
+                <label
+                  key={key}
+                  className="template-card"
+                  htmlFor={`template-${key}`}
+                >
+                  <input
+                    id={`template-${key}`}
+                    className="template-radio"
+                    type="radio"
+                    name="template"
+                    value={key}
+                    defaultChecked={isDefault}
+                  />
+                  <span className="template-card-body">
+                    <span className="row" style={{ ["--gap" as never]: "10px", marginBottom: 8 }}>
+                      <span className="template-icon">{t.icon}</span>
+                      <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: "-0.015em" }}>
+                        {t.name}
+                      </span>
+                    </span>
+                    <span className="template-tagline">{t.tagline}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+
         <div className="field-with-help">
           <div style={{ display: "flex", alignItems: "center", marginBottom: 0 }}>
             <label className="field-label" htmlFor="create-agenda" style={{ marginBottom: 0 }}>

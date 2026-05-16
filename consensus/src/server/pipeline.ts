@@ -17,9 +17,11 @@
 
 import { prisma } from "@/src/lib/prisma";
 import { loadPrompt } from "@/src/lib/prompts";
-import { broadcast } from "./wsHub";
+import { broadcast, type WsSpan } from "./wsHub";
 import { callMediator, type ConversationItem } from "./openai";
 import { classifyUtterance } from "./integrations/pioneer";
+import { classify as glinerClassify } from "./integrations/gliner";
+import { getTemplate } from "@/src/lib/templates";
 
 // If Pioneer is this confident the message is off-topic, skip the OpenAI turn
 // entirely — just mark filtered and broadcast. Keeps GPT off the hot path.
@@ -78,8 +80,24 @@ async function broadcastMessage(roomId: string, messageId: string) {
       username: m.user?.username ?? null,
       sentAt: m.sentAt.toISOString(),
       seq: m.seq,
+      category: m.category,
+      categoryConfidence: m.categoryConfidence,
+      sentiment: m.sentiment,
+      sentimentConfidence: m.sentimentConfidence,
+      // Persisted as JSON string; re-parse for the wire so clients see structured spans.
+      spans: parseSpans(m.spans),
     },
   });
+}
+
+function parseSpans(raw: string | null): WsSpan[] | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as WsSpan[]) : null;
+  } catch {
+    return null;
+  }
 }
 
 async function loadHistory(roomId: string): Promise<ConversationItem[]> {
@@ -143,6 +161,32 @@ async function runTurn(
       });
       await broadcastMessage(roomId, newMessageId);
       return;
+    }
+
+    // GLiNER classification — runs only on on-topic user messages. Fail-soft:
+    // any error or timeout just leaves the message un-classified and the
+    // mediator turn continues.
+    const template = getTemplate(room.template);
+    if (template.labels.length > 0) {
+      try {
+        const cls = await glinerClassify({
+          text: newMessage.text,
+          labels: template.labels,
+        });
+        await prisma.message.update({
+          where: { id: newMessageId },
+          data: {
+            category: cls.category,
+            categoryConfidence: cls.categoryConfidence,
+            sentiment: cls.sentiment,
+            sentimentConfidence: cls.sentimentConfidence,
+            spans: cls.spans.length > 0 ? JSON.stringify(cls.spans) : null,
+          },
+        });
+        await broadcastMessage(roomId, newMessageId);
+      } catch (err) {
+        console.error("[pipeline] gliner classify failed, continuing un-classified", err);
+      }
     }
   }
 

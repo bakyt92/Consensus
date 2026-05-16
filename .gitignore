@@ -1,0 +1,8 @@
+# Secrets — sponsor API keys live here; NEVER commit.
+.env
+.env.*
+!.env.example
+
+# OS noise
+.DS_Store
+Thumbs.db

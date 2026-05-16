@@ -27,6 +27,14 @@ export type WsEvent =
   | { type: "participants"; participants: Participant[] }
   | { type: "closed"; redirectTo: string };
 
+export type WsSpan = {
+  label: string;
+  text: string;
+  start: number;
+  end: number;
+  confidence: number;
+};
+
 export type WsMessage = {
   id: string;
   role: "system" | "user" | "mediator";
@@ -36,6 +44,12 @@ export type WsMessage = {
   username: string | null;
   sentAt: string;
   seq: number;
+  // GLiNER classification — null until classified (or always null for stub mode + system/mediator messages).
+  category: string | null;
+  categoryConfidence: number | null;
+  sentiment: string | null; // "positive" | "negative" | "neutral"
+  sentimentConfidence: number | null;
+  spans: WsSpan[] | null;
 };
 
 export type Participant = {

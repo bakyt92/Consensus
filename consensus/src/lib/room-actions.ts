@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "./prisma";
 import { getSessionUser } from "./session";
 import { kickoffRoom, enqueueMessage } from "@/src/server/pipeline";
+import { TEMPLATE_KEYS, type TemplateKey } from "./templates";
 
 const codeAlphabet = customAlphabet("ABCDEFGHJKMNPQRSTUVWXYZ23456789", 4);
 const prefix = customAlphabet("ABCDEFGHJKMNPQRSTUVWXYZ", 3);
@@ -20,6 +21,13 @@ const CreateInput = z.object({
   // No longer collected from UI — default to 8 (sweet spot). Schema column
   // kept for future "cap" UX; can drop in a later migration if unused.
   maxParticipants: z.number().int().min(2).max(64).optional().default(8),
+  // Meeting template picked at room creation; gates the label set and
+  // right-pane summary shape. Defaults to "debate" — the most common
+  // decision-shaped meeting and aligned with the example agenda copy.
+  template: z
+    .enum(TEMPLATE_KEYS as [TemplateKey, ...TemplateKey[]])
+    .optional()
+    .default("debate"),
 });
 
 export type CreateRoomResult = { ok: false; error: string };
@@ -33,7 +41,7 @@ export async function createRoom(input: unknown): Promise<CreateRoomResult | nev
   if (!parsed.success) {
     return { ok: false as const, error: "Agenda and criteria are required (≥10 chars each)." };
   }
-  const { agenda, criteria, maxParticipants } = parsed.data;
+  const { agenda, criteria, maxParticipants, template } = parsed.data;
   const firstLine = agenda.split("\n").map((l) => l.trim()).find(Boolean) ?? agenda;
   const agendaTitle = firstLine.slice(0, 80);
 
@@ -52,6 +60,7 @@ export async function createRoom(input: unknown): Promise<CreateRoomResult | nev
       criteria,
       agendaTitle,
       maxParticipants,
+      template,
       adminId: user.id,
       memberships: {
         create: [{ userId: user.id, role: "admin" }],
@@ -79,6 +88,7 @@ export async function createRoomFormAction(
   return createRoom({
     agenda: formData.get("agenda")?.toString() ?? "",
     criteria: formData.get("criteria")?.toString() ?? "",
+    template: formData.get("template")?.toString() || undefined,
   });
 }
 

@@ -3,6 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+export type RoomSpan = {
+  label: string;
+  text: string;
+  start: number;
+  end: number;
+  confidence: number;
+};
+
+export type Sentiment = "positive" | "negative" | "neutral";
+
 export type RoomMessage = {
   id: string;
   role: "system" | "user" | "mediator";
@@ -12,6 +22,11 @@ export type RoomMessage = {
   username: string | null;
   sentAt: string;
   seq: number;
+  category: string | null;
+  categoryConfidence: number | null;
+  sentiment: Sentiment | null;
+  sentimentConfidence: number | null;
+  spans: RoomSpan[] | null;
 };
 
 export type Participant = {

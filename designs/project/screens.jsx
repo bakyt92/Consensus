@@ -347,6 +347,7 @@ function Lobby({ user, onCreateNew, onJoinRoom }) {
 // 3. CREATE ROOM
 // ============================================================
 function CreateRoom({ user, onBack, onCreated }) {
+  const [template, setTemplate] = useState('debate'); // default per spec
   const [agenda, setAgenda] = useState('');
   const [criteria, setCriteria] = useState('');
   const [maxParticipants, setMaxParticipants] = useState(8);
@@ -366,7 +367,7 @@ function CreateRoom({ user, onBack, onCreated }) {
   function handleSubmit(e) {
     e.preventDefault();
     if (!agenda.trim() || !criteria.trim()) return;
-    onCreated({ agenda: agenda.trim(), criteria: criteria.trim(), maxParticipants });
+    onCreated({ template, agenda: agenda.trim(), criteria: criteria.trim(), maxParticipants });
   }
 
   function loadExample() {
@@ -397,6 +398,65 @@ function CreateRoom({ user, onBack, onCreated }) {
         </button>
 
         <form onSubmit={handleSubmit} className="stack" style={{'--gap': '32px'}}>
+          {/* TEMPLATE PICKER */}
+          <div className="field-with-help">
+            <div style={{display: 'flex', alignItems: 'center'}}>
+              <label className="field-label" style={{marginBottom: 0}}>Meeting template</label>
+              <button
+                type="button"
+                className="help-trigger"
+                onClick={(e) => { e.stopPropagation(); setOpenPopover(p => p === 'template' ? null : 'template'); }}
+              >?</button>
+              {openPopover === 'template' && (
+                <div className="popover" style={{top: 32, left: 0}}>
+                  <div className="label on-navy">TEMPLATES</div>
+                  Templates change the <strong style={{color: 'var(--cream)'}}>shape of the live summary</strong>, the label set the mediator uses, and the chip under each chat message. The conversation itself works the same way regardless.
+                </div>
+              )}
+            </div>
+            <p className="body" style={{margin: '4px 0 14px', fontSize: 13, color: 'var(--muted)'}}>
+              Pick the shape this meeting wants to take. You can switch later from the admin menu.
+            </p>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10}}>
+              {window.TEMPLATE_ORDER.map((key) => {
+                const t = window.TEMPLATES[key];
+                const on = template === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setTemplate(key)}
+                    className="card"
+                    style={{
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      padding: '14px 16px',
+                      borderColor: on ? 'var(--navy)' : undefined,
+                      borderWidth: on ? 2 : undefined,
+                      background: on ? '#fff' : undefined,
+                      fontFamily: 'inherit',
+                      transition: 'all 0.14s',
+                      position: 'relative',
+                    }}
+                  >
+                    <div className="row" style={{'--gap': '10px', marginBottom: 8}}>
+                      <div style={{
+                        width: 26, height: 26, borderRadius: 4,
+                        background: on ? 'var(--navy)' : 'var(--cream-2)',
+                        color: on ? 'var(--cream)' : 'var(--navy)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontFamily: 'Archivo', fontWeight: 800, fontSize: 13, letterSpacing: '-0.02em',
+                      }}>{t.icon}</div>
+                      <span style={{fontWeight: 700, fontSize: 14, letterSpacing: '-0.015em'}}>{t.name}</span>
+                      {on && <span style={{marginLeft: 'auto'}}><Icon.Check style={{color: 'var(--rust)', width: 16, height: 16}}/></span>}
+                    </div>
+                    <p style={{margin: 0, fontSize: 12.5, lineHeight: 1.4, color: 'var(--muted)'}}>{t.tagline}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* AGENDA */}
           <div className="field-with-help">
             <div style={{display: 'flex', alignItems: 'center', marginBottom: 0}}>
