@@ -3,22 +3,35 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const updateMembership = vi.fn().mockResolvedValue({});
 const findMembership = vi.fn();
 
-vi.mock("@/src/lib/prisma", () => ({
-  prisma: {
-    membership: {
-      findUnique: (...args: unknown[]) => findMembership(...args),
-      update: (...args: unknown[]) => updateMembership(...args),
+vi.mock("@/src/lib/prisma", () => {
+  const deleteMany = () => Promise.resolve({});
+  return {
+    prisma: {
+      membership: {
+        findUnique: (...args: unknown[]) => findMembership(...args),
+        update: (...args: unknown[]) => updateMembership(...args),
+        deleteMany,
+      },
+      room: {
+        findUnique: vi
+          .fn()
+          .mockResolvedValue({ id: "r1", code: "AAA-BBBB" }),
+        deleteMany,
+      },
+      user: {
+        findUnique: vi.fn().mockResolvedValue({ id: "u1", username: "alice" }),
+        deleteMany,
+      },
+      // Setup's afterEach wipes these too — keep noop stubs so cleanup doesn't crash.
+      consensusSnapshot: { deleteMany },
+      summary: { deleteMany },
+      message: { deleteMany },
+      magicLink: { deleteMany },
+      session: { deleteMany },
+      $disconnect: () => Promise.resolve(undefined),
     },
-    room: {
-      findUnique: vi
-        .fn()
-        .mockResolvedValue({ id: "r1", code: "AAA-BBBB" }),
-    },
-    user: {
-      findUnique: vi.fn().mockResolvedValue({ id: "u1", username: "alice" }),
-    },
-  },
-}));
+  };
+});
 
 const createClone = vi.fn();
 vi.mock("@/src/server/integrations/elevenlabs", () => ({
