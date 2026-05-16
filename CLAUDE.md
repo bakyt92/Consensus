@@ -25,7 +25,10 @@ to it.
 | DB | **SQLite + Prisma 7** (better-sqlite3 adapter, file at `prisma/dev.db`) |
 | Realtime | **Custom server** wraps `next` + `ws.Server` on the same HTTP listener |
 | Auth | Email + username; cookie session (signed JWT via `jose`). Returning users get a magic link. |
-| LLM | **OpenAI** Chat Completions with JSON Schema structured output (default model: `gpt-4o-mini`, env-configurable) |
+| LLM | **OpenAI** Chat Completions with JSON Schema structured output (default model: `gpt-4o-mini`, env-configurable). Used for mediator reply + summary + consensus rollup. |
+| Voice input | **SLNG** — diarized STT (and, eventually, the LiveKit-style multi-party audio room). Adapter at `src/server/integrations/slng.ts`; stub mode active when `SLNG_API_KEY` is unset. |
+| Voice output | **Gradium** — TTS for the mediator. Adapter at `src/server/integrations/gradium.ts`; stub mode (no audio played) active when `GRADIUM_API_KEY` is unset. |
+| Fast classifier | **Pioneer** — per-utterance on-topic + consensus-delta verdict, runs before OpenAI. Adapter at `src/server/integrations/pioneer.ts`; stub mode treats every message as on-topic. |
 | Email (magic links) | Console-log in dev. Set `RESEND_API_KEY` to switch to Resend. |
 
 ## Architectural rules
@@ -59,6 +62,18 @@ These decisions aren't obvious from any single file. Honor them unless explicitl
    imports from `src/lib/session-core.ts` (pure JWT helpers). Anything
    that needs `cookies()` lives in `src/lib/session.ts` and is only
    imported from App Router code.
+8. **Two-tier inference.** Pioneer runs on every user message inside
+   `runTurn` before OpenAI. If Pioneer is ≥80% confident the message is
+   off-topic, the row is marked `filtered`, broadcast, and the OpenAI
+   call is skipped entirely — the mediator stays quiet. OpenAI only sees
+   messages that survived the classifier. Threshold lives in
+   `src/server/pipeline.ts` as `PIONEER_SKIP_THRESHOLD`.
+9. **Voice adapters are pluggable stubs.** SLNG (input), Gradium
+   (output), and Pioneer (classifier) all live under
+   `src/server/integrations/`. Each exports an `*IsConfigured()` guard
+   and falls back to a stub when its API key is absent so the app boots
+   and demos without sponsor credentials. Real SDK calls are the only
+   thing that should change inside each file.
 
 ## Layout
 
@@ -72,6 +87,8 @@ consensus/
 │   ├── room/[code]/end/       # Closed-meeting minutes view
 │   ├── auth/magic/[token]/    # Magic-link consumer
 │   ├── api/room/[code]/minutes/ # .md export endpoint
+│   ├── api/room/[code]/voice/   # POST audio blob → SLNG STT → enqueueMessage
+│   ├── api/room/[code]/tts/     # POST { text } → Gradium → audio bytes (204 when stubbed)
 │   └── error/                 # Reusable error screen (?reason=…)
 ├── prisma/
 │   ├── schema.prisma          # User, Room, Membership, Message, Summary, ConsensusSnapshot
@@ -88,9 +105,13 @@ consensus/
 │   │   └── prompts.ts         # filesystem prompt loader (cached in prod)
 │   ├── server/
 │   │   ├── wsHub.ts           # in-process room → Set<WsClient> map (broadcast/register/unregister)
-│   │   ├── pipeline.ts        # serial per-room LLM queue
-│   │   └── openai.ts          # OpenAI call + zod-validated structured output
-│   └── components/            # Brand, EntryShell, Icon, Markdown, useRoomChannel hook
+│   │   ├── pipeline.ts        # serial per-room LLM queue, two-tier inference
+│   │   ├── openai.ts          # OpenAI call + zod-validated structured output
+│   │   └── integrations/
+│   │       ├── slng.ts        # diarized STT (input) — stub mode when no key
+│   │       ├── gradium.ts     # mediator TTS (output) — stub returns null
+│   │       └── pioneer.ts     # fast on-topic classifier — stub passes all through
+│   └── components/            # Brand, EntryShell, Icon, Markdown, useRoomChannel, useVoiceCapture, useVoicePlayback
 ├── server.ts                  # Custom Next + ws.Server entrypoint
 ├── prisma.config.ts           # Prisma 7 config (datasource.url, migration path)
 ├── tsconfig.json              # Default (app code)
@@ -125,6 +146,15 @@ Copy `.env.example` to `.env.local` and fill at minimum:
 - `APP_ORIGIN` — origin used to build magic-link URLs.
 - `RESEND_API_KEY` / `RESEND_FROM` — optional; turns on real email
   delivery. Otherwise links go to the dev console.
+- `SLNG_API_KEY` — optional; without it voice input runs in stub mode
+  (placeholder transcript so the mic loop is still demoable).
+- `GRADIUM_API_KEY` — optional; without it the TTS route returns 204 and
+  the mediator stays silent (UI toggle still works).
+- `PIONEER_API_KEY` — optional; without it every message is treated as
+  on-topic and the OpenAI mediator runs every turn (no two-tier savings).
+- `PIONEER_STUB_FILTER=1` — dev convenience; with stub Pioneer, any
+  message containing the word "spam" is filtered. Useful for exercising
+  the off-topic path without a real classifier key.
 
 ## Where the design lives
 

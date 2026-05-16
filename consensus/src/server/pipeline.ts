@@ -19,6 +19,11 @@ import { prisma } from "@/src/lib/prisma";
 import { loadPrompt } from "@/src/lib/prompts";
 import { broadcast } from "./wsHub";
 import { callMediator, type ConversationItem } from "./openai";
+import { classifyUtterance } from "./integrations/pioneer";
+
+// If Pioneer is this confident the message is off-topic, skip the OpenAI turn
+// entirely — just mark filtered and broadcast. Keeps GPT off the hot path.
+const PIONEER_SKIP_THRESHOLD = 0.8;
 
 type QueueState = {
   tail: Promise<void>;
@@ -111,6 +116,33 @@ async function runTurn(
     });
     if (m && m.user) {
       newMessage = { username: m.user.username, text: m.text };
+    }
+  }
+
+  // Two-tier inference: Pioneer first (fast), OpenAI only if message clears
+  // the filter. Skipping OpenAI is the whole point — keeps cost + latency
+  // low and lets the mediator stay quiet on noise.
+  if (newMessageId && newMessage) {
+    const verdict = await classifyUtterance({
+      text: newMessage.text,
+      agenda: room.agenda,
+      criteria: room.criteria,
+      username: newMessage.username,
+    }).catch((err) => {
+      console.error("[pipeline] pioneer classify failed, falling through", err);
+      return null;
+    });
+    if (
+      verdict &&
+      !verdict.isOnTopic &&
+      verdict.confidence >= PIONEER_SKIP_THRESHOLD
+    ) {
+      await prisma.message.update({
+        where: { id: newMessageId },
+        data: { filtered: true },
+      });
+      await broadcastMessage(roomId, newMessageId);
+      return;
     }
   }
 

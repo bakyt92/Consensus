@@ -11,10 +11,13 @@ import {
   Lock,
   Mic,
   Send,
+  Speaker,
   Users,
 } from "@/src/components/Icon";
 import { Markdown, renderInline } from "@/src/components/Markdown";
 import { useRoomChannel, type RoomMessage } from "@/src/components/useRoomChannel";
+import { useVoiceCapture } from "@/src/components/useVoiceCapture";
+import { useVoicePlayback } from "@/src/components/useVoicePlayback";
 import {
   sendMessage,
   lockRoom,
@@ -106,6 +109,15 @@ export function RoomClient(props: Props) {
   const consensusMet = consensus.status === "REACHED";
   const composeDisabled =
     status === "CLOSED" || status === "STOPPING" || !connected;
+
+  const voice = useVoiceCapture({
+    code: props.code,
+    onError: (msg) => setError(msg),
+    onTranscript: (_text, stubbed) => {
+      if (stubbed) setError("Voice in stub mode — set SLNG_API_KEY for real STT.");
+    },
+  });
+  const tts = useVoicePlayback({ code: props.code, messages });
 
   return (
     <div className="room">
@@ -272,13 +284,33 @@ export function RoomClient(props: Props) {
                 </span>
               </div>
             </div>
-            <span className="pill">
-              <span
-                className="dot"
-                style={{ background: "var(--ok)" }}
-              ></span>{" "}
-              Mediator on
-            </span>
+            <div className="row" style={{ ["--gap" as never]: "6px" }}>
+              <button
+                type="button"
+                onClick={tts.toggle}
+                className={"pill" + (tts.enabled ? " ok" : "")}
+                style={{
+                  cursor: "pointer",
+                  border: "1px solid var(--line)",
+                  background: tts.enabled ? "var(--ok-soft)" : "transparent",
+                }}
+                title={
+                  tts.enabled
+                    ? "Mediator voice on — click to mute"
+                    : "Mediator voice off — click to hear replies aloud"
+                }
+              >
+                <Speaker style={{ opacity: tts.enabled ? 1 : 0.55 }} />
+                {tts.speaking ? "Speaking…" : tts.enabled ? "Voice on" : "Voice off"}
+              </button>
+              <span className="pill">
+                <span
+                  className="dot"
+                  style={{ background: "var(--ok)" }}
+                ></span>{" "}
+                Mediator on
+              </span>
+            </div>
           </div>
 
           <div className="chat-feed" ref={feedRef}>
@@ -340,9 +372,30 @@ export function RoomClient(props: Props) {
                   disabled={composeDisabled}
                 />
                 <button
-                  className="icon-btn"
-                  disabled
-                  title="Speech-to-text — coming soon"
+                  className={"icon-btn" + (voice.isRecording ? " recording" : "")}
+                  disabled={
+                    composeDisabled || voice.isUploading || !voice.supported
+                  }
+                  onMouseDown={voice.start}
+                  onMouseUp={voice.stop}
+                  onMouseLeave={() => voice.isRecording && voice.stop()}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    void voice.start();
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    voice.stop();
+                  }}
+                  title={
+                    !voice.supported
+                      ? "Voice input not supported in this browser"
+                      : voice.isRecording
+                        ? "Release to send"
+                        : voice.isUploading
+                          ? "Transcribing…"
+                          : "Hold to speak"
+                  }
                   type="button"
                 >
                   <Mic />
