@@ -129,7 +129,14 @@ async function runTurn(
       criteria: room.criteria,
       username: newMessage.username,
     }).catch((err) => {
-      console.error("[pipeline] pioneer classify failed, falling through", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      const isCertErr =
+        msg.includes("CERT_HAS_EXPIRED") ||
+        (err as { cause?: { code?: string } } | null)?.cause?.code ===
+          "CERT_HAS_EXPIRED";
+      if (!isCertErr) {
+        console.error("[pipeline] pioneer classify failed, falling through", err);
+      }
       return null;
     });
     if (
