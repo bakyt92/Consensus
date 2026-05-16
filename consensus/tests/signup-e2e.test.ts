@@ -129,56 +129,94 @@ afterAll(async () => {
 });
 
 // =============================================================
-// Helpers
+// Helpers — native multipart form submission
 // =============================================================
 
 /**
- * The form calls `signupFormAction(prevState, formData)` via the React 19
- * declarative pattern, which has a non-trivial multipart encoding (it bakes
- * the prevState into the request body). Driving that from raw HTTP is brittle
- * and unstable across Next.js versions.
+ * Submit Server-Action-backed forms the same way the browser does pre-hydration:
+ * a multipart POST that includes the hidden `$ACTION_*` fields that Next renders
+ * into the form. This is more robust than driving the JS-handled `Next-Action`
+ * header path (which targets only the form-action wrapper in Next 16+ turbo,
+ * uses a different body encoding, and shifts shape between Next versions).
  *
- * Instead, we test the underlying `signupOrRequestLink(input)` directly —
- * it's the only function that touches Prisma + cookies, and the form-action
- * wrapper is a 2-line FormData unwrapper. That gives us coverage of the
- * auth logic without coupling to the Next-Action wire format.
+ * It also exercises the exact code path a user hits when client hydration is
+ * delayed/broken — the failure mode we keep hitting in this app.
  */
-async function findSignupActionId(): Promise<string> {
-  const html = await (await fetch(`${BASE}/sign-up`)).text();
-  const chunks = [
-    ...new Set(
-      [...html.matchAll(/\/_next\/static\/chunks\/[^"'\s]+\.js/g)].map(
-        (m) => m[0],
-      ),
-    ),
-  ];
-  for (const c of chunks) {
-    const js = await (await fetch(`${BASE}${c}`)).text();
-    const m = js.match(
-      /"([0-9a-f]{40,})":\s*\{\s*"name":\s*"signupOrRequestLink"/,
-    );
-    if (m) return m[1]!;
-  }
-  throw new Error("Server-action id for signupOrRequestLink not found");
-}
-
 function getSetCookies(res: Response): string[] {
   return (
     res.headers.getSetCookie?.() ?? [res.headers.get("set-cookie") ?? ""]
   ).filter(Boolean);
 }
 
-async function postSignupAction(args: { email: string; username: string }) {
-  const actionId = await findSignupActionId();
-  return fetch(`${BASE}/sign-up`, {
-    method: "POST",
-    headers: {
-      Accept: "text/x-component",
-      "Content-Type": "text/plain;charset=UTF-8",
-      "Next-Action": actionId,
-    },
-    body: JSON.stringify([args]),
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+/** Pull every <input type="hidden"> out of a rendered HTML page. */
+function extractHiddenInputs(html: string): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  const re = /<input([^>]*\btype="hidden"[^>]*?)\/?>/g;
+  for (const m of html.matchAll(re)) {
+    const attrs = m[1]!;
+    const name = attrs.match(/\bname="([^"]*)"/)?.[1];
+    const value = attrs.match(/\bvalue="([^"]*)"/)?.[1] ?? "";
+    if (name) out.push([name, decodeEntities(value)]);
+  }
+  return out;
+}
+
+/**
+ * Native multipart POST that replays the form on `pageUrl`. Hidden $ACTION_*
+ * fields are pulled out of the rendered HTML and replayed verbatim; only the
+ * `fields` are user-controlled. Mirrors how a browser submits a React 19
+ * `<form action={serverAction}>` pre-hydration.
+ */
+async function nativeFormPost(
+  pageUrl: string,
+  fields: Record<string, string>,
+  cookie?: string,
+): Promise<Response> {
+  const pageRes = await fetch(pageUrl, {
+    headers: cookie ? { cookie } : {},
   });
+  const html = await pageRes.text();
+  const fd = new FormData();
+  let sawActionRef = false;
+  for (const [k, v] of extractHiddenInputs(html)) {
+    fd.append(k, v);
+    if (k.startsWith("$ACTION_")) sawActionRef = true;
+  }
+  if (!sawActionRef) {
+    throw new Error(
+      `No $ACTION_* hidden fields in ${pageUrl} — form did not render as a server-action target.`,
+    );
+  }
+  for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+
+  return fetch(pageUrl, {
+    method: "POST",
+    body: fd,
+    redirect: "manual",
+    headers: cookie ? { cookie } : {},
+  });
+}
+
+async function postSignupAction(args: { email: string; username: string }) {
+  return nativeFormPost(`${BASE}/sign-up`, args);
+}
+
+/** Extract the `name=value` of `consensus_session` from a Response's Set-Cookie. */
+function extractSessionCookie(res: Response): string | undefined {
+  const c = getSetCookies(res).find((c) =>
+    c.startsWith("consensus_session="),
+  );
+  return c ? c.split(";")[0] : undefined;
 }
 
 // =============================================================
@@ -192,24 +230,30 @@ describe("signup e2e (custom server + Server Action POST + Prisma)", () => {
     expect(await res.text()).toMatch(/Create your.*delegation/s);
   });
 
-  it("POST signup action: new email → 200, kind=session, sets HttpOnly cookie", async () => {
+  it("POST signup form: new email → 307 to /lobby, sets HttpOnly session cookie", async () => {
     const res = await postSignupAction({
       email: "newuser@example.com",
       username: "New User",
     });
-    const body = await res.text();
-    expect(
-      res.status,
-      `expected 200, got ${res.status}. body=${body.slice(0, 400)}`,
-    ).toBe(200);
 
-    // The RSC stream encodes the action return value. Assert it contains
-    // kind=session and DOES NOT contain kind=error (which is what we'd see
-    // if the action ran but Prisma couldn't find the table, etc.).
-    expect(body, `expected kind=session, body=${body.slice(0, 400)}`).toMatch(
-      /"kind":\s*"session"/,
-    );
-    expect(body).not.toMatch(/"kind":\s*"error"/);
+    // signupOrRequestLink calls setSessionCookie and returns kind=session;
+    // useEffect in <SignupForm> redirects to /lobby once that state is seen.
+    // For native form POST, Next encodes the redirect as 307/303 with Location.
+    expect(
+      [200, 303, 307],
+      `unexpected status ${res.status}. body=${(await res.clone().text()).slice(0, 400)}`,
+    ).toContain(res.status);
+    // If 200 (no router-driven redirect), the body must still indicate session;
+    // if 307/303, the Location header must point at /lobby.
+    if (res.status === 200) {
+      const body = await res.text();
+      expect(body, `expected kind=session, body=${body.slice(0, 400)}`).toMatch(
+        /"kind":\s*"session"/,
+      );
+      expect(body).not.toMatch(/"kind":\s*"error"/);
+    } else {
+      expect(res.headers.get("location")).toMatch(/\/lobby$/);
+    }
 
     const cookies = getSetCookies(res);
     const session = cookies.find((c) => c.startsWith("consensus_session="));
@@ -218,7 +262,7 @@ describe("signup e2e (custom server + Server Action POST + Prisma)", () => {
     expect(session).toMatch(/SameSite=lax/i);
   });
 
-  it("POST signup action: existing email → 200, kind=magic_sent, NO session cookie", async () => {
+  it("POST signup form: existing email → magic_sent path, NO session cookie", async () => {
     // Seed a returning user via a fresh PrismaClient pointed at the e2e DB.
     const { PrismaClient } = await import("@prisma/client");
     const { PrismaBetterSqlite3 } = await import(
@@ -236,9 +280,15 @@ describe("signup e2e (custom server + Server Action POST + Prisma)", () => {
       email: "returning@example.com",
       username: "ignored",
     });
-    expect(res.status).toBe(200);
+
+    // No client-side redirect for the magic-link branch: the form re-renders
+    // in place with the "check your inbox" UI. Native POST returns 200 +
+    // the new HTML (server-rendered with the updated state).
+    expect([200, 303]).toContain(res.status);
     const body = await res.text();
-    expect(body).toMatch(/"kind":\s*"magic_sent"/);
+    // Either the state encoding (kind=magic_sent) or the rendered "check your
+    // inbox" screen is acceptable — both prove the magic-link branch ran.
+    expect(body).toMatch(/(magic_sent|check your inbox|We sent you)/i);
 
     const cookies = getSetCookies(res);
     expect(
@@ -290,45 +340,21 @@ describe("signup e2e (custom server + Server Action POST + Prisma)", () => {
 // =============================================================
 
 /**
- * Sign up via the same Server-Action POST the form uses, return the session
- * cookie. We need a real signed-in session to (a) reach /create at all and
- * (b) have the cookie ready for the createRoom action POST.
+ * Sign up via native form POST, return the session cookie string (`name=value`)
+ * suitable for the `Cookie` request header.
  */
 async function signUpAndGetCookie(email: string, username: string): Promise<string> {
   const res = await postSignupAction({ email, username });
-  if (res.status !== 200) {
-    throw new Error(`signup failed: ${res.status} ${await res.text()}`);
+  if (res.status >= 400) {
+    throw new Error(`signup failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
   }
-  const session = getSetCookies(res).find((c) =>
-    c.startsWith("consensus_session="),
-  );
-  if (!session) throw new Error("signup did not return a session cookie");
-  // We only need the cookie's name=value pair for the Cookie request header.
-  return session.split(";")[0]!;
-}
-
-/**
- * Find the server-action id for `createRoom`. Same approach as the signup
- * helper: visit /create with a valid session so Next compiles the route,
- * then grep the dev JS chunks it references for the action registry entry.
- */
-async function findCreateRoomActionId(cookie: string): Promise<string> {
-  const html = await (
-    await fetch(`${BASE}/create`, { headers: { cookie } })
-  ).text();
-  const chunks = [
-    ...new Set(
-      [...html.matchAll(/\/_next\/static\/chunks\/[^"'\s]+\.js/g)].map(
-        (m) => m[0],
-      ),
-    ),
-  ];
-  for (const c of chunks) {
-    const js = await (await fetch(`${BASE}${c}`)).text();
-    const m = js.match(/"([0-9a-f]{40,})":\s*\{\s*"name":\s*"createRoom"/);
-    if (m) return m[1]!;
+  const cookie = extractSessionCookie(res);
+  if (!cookie) {
+    throw new Error(
+      `signup did not set consensus_session cookie. status=${res.status}, set-cookie=${getSetCookies(res)}`,
+    );
   }
-  throw new Error("Server-action id for createRoom not found");
+  return cookie;
 }
 
 async function postCreateRoomAction(args: {
@@ -336,18 +362,11 @@ async function postCreateRoomAction(args: {
   agenda: string;
   criteria: string;
 }): Promise<Response> {
-  const actionId = await findCreateRoomActionId(args.cookie);
-  return fetch(`${BASE}/create`, {
-    method: "POST",
-    redirect: "manual",
-    headers: {
-      Accept: "text/x-component",
-      "Content-Type": "text/plain;charset=UTF-8",
-      "Next-Action": actionId,
-      cookie: args.cookie,
-    },
-    body: JSON.stringify([{ agenda: args.agenda, criteria: args.criteria }]),
-  });
+  return nativeFormPost(
+    `${BASE}/create`,
+    { agenda: args.agenda, criteria: args.criteria },
+    args.cookie,
+  );
 }
 
 describe("create-room e2e (main user flow)", () => {
@@ -394,26 +413,16 @@ describe("create-room e2e (main user flow)", () => {
     });
 
     expect(
-      [200, 303],
-      `expected 200 or 303, got ${res.status}: ${await res.clone().text()}`,
+      [303, 307],
+      `expected redirect status, got ${res.status}: ${(await res.clone().text()).slice(0, 400)}`,
     ).toContain(res.status);
 
-    // Next encodes the redirect target either in Location (303) or in the
-    // x-action-redirect header (for Next-Action POST). Accept either; assert
-    // it points at /room/<code>, NOT at /create.
-    const loc =
-      res.headers.get("location") ??
-      res.headers.get("x-action-redirect") ??
-      "";
-    const body = await res.text();
-    const targetFromBody = body.match(/\/room\/[A-Z]+-[A-Z0-9]+/i)?.[0] ?? "";
-    const target = loc || targetFromBody;
-
+    const loc = res.headers.get("location") ?? "";
     expect(
-      target,
-      `redirect target not found.\n  status=${res.status}\n  location=${loc}\n  x-action-redirect=${res.headers.get("x-action-redirect")}\n  body head=${body.slice(0, 400)}`,
+      loc,
+      `expected /room/<code>, got Location=${loc}, status=${res.status}`,
     ).toMatch(/\/room\/[A-Z]+-[A-Z0-9]+/);
-    expect(target, "redirect must NOT land back at /create").not.toMatch(
+    expect(loc, "redirect must NOT land back at /create").not.toMatch(
       /\/create(\?|$)/,
     );
   });
@@ -429,11 +438,12 @@ describe("create-room e2e (main user flow)", () => {
       criteria: goodCriteria,
     });
 
-    const loc =
-      res.headers.get("location") ??
-      res.headers.get("x-action-redirect") ??
-      (await res.clone().text()).match(/\/room\/[A-Z]+-[A-Z0-9]+/i)?.[0];
-    if (!loc) throw new Error("no redirect target on createRoom response");
+    const loc = res.headers.get("location");
+    if (!loc || !/\/room\//.test(loc)) {
+      throw new Error(
+        `createRoom didn't redirect to a room. status=${res.status}, location=${loc}`,
+      );
+    }
 
     // Browser semantics: follow the redirect with the same session.
     const roomRes = await fetch(`${BASE}${loc}`, {
@@ -445,49 +455,63 @@ describe("create-room e2e (main user flow)", () => {
       `room page bounced. status=${roomRes.status}, location=${roomRes.headers.get("location")}`,
     ).toBe(200);
     const roomBody = await roomRes.text();
-    // RoomClient renders the agenda title — proves we landed in the actual
-    // room, not on /error or /sign-up.
-    expect(roomBody).not.toMatch(/Create your.*delegation/s); // not signup
-    expect(roomBody).not.toMatch(/Something went wrong/i); // not error page
+    // The agenda we submitted must appear in the rendered room — proves we
+    // landed in the right room with the right state, not on /error or /sign-up.
+    expect(roomBody).toMatch(/Decide whether to ship v3 redesign/);
+    expect(roomBody).not.toMatch(/Create your.*delegation/s);
+    expect(roomBody).not.toMatch(/Something went wrong/i);
   });
 
-  it("POST createRoom: empty body → action returns kind=error, NO redirect", async () => {
+  it("POST createRoom: too-short input → no redirect, error surfaced", async () => {
     const cookie = await signUpAndGetCookie(
       `room-bad-${Date.now()}@example.com`,
       "RoomBadUser",
     );
+    // Both fields well under the 10-char minLength so server-side zod fails.
     const res = await postCreateRoomAction({
       cookie,
-      agenda: "",
-      criteria: "",
+      agenda: "x",
+      criteria: "y",
     });
-    // Validation fail → action returns {ok:false, error}, no redirect.
-    expect(res.headers.get("location")).toBeFalsy();
-    expect(res.headers.get("x-action-redirect")).toBeFalsy();
+    expect(
+      res.headers.get("location"),
+      `validation fail must NOT redirect. got Location=${res.headers.get("location")}`,
+    ).toBeFalsy();
+    expect(res.status).toBeLessThan(400);
     const body = await res.text();
     expect(body).toMatch(/Agenda and criteria are required/);
   });
 
-  it("POST createRoom without session → action returns kind=error, NO redirect", async () => {
-    // Get an action id with a throwaway session, then call WITHOUT that cookie.
+  it("POST createRoom WITHOUT session → no room redirect", async () => {
+    // Get a session to render /create (so we can extract the action ref),
+    // then strip the cookie on the final POST to simulate an anon submitter.
     const tmpCookie = await signUpAndGetCookie(
       `room-noauth-${Date.now()}@example.com`,
       "NoAuth",
     );
-    const actionId = await findCreateRoomActionId(tmpCookie);
+    const html = await (
+      await fetch(`${BASE}/create`, { headers: { cookie: tmpCookie } })
+    ).text();
+    const fd = new FormData();
+    for (const [k, v] of extractHiddenInputs(html)) fd.append(k, v);
+    fd.append("agenda", goodAgenda);
+    fd.append("criteria", goodCriteria);
     const res = await fetch(`${BASE}/create`, {
       method: "POST",
+      body: fd,
       redirect: "manual",
-      headers: {
-        Accept: "text/x-component",
-        "Content-Type": "text/plain;charset=UTF-8",
-        "Next-Action": actionId,
-        // no cookie
-      },
-      body: JSON.stringify([{ agenda: goodAgenda, criteria: goodCriteria }]),
+      // deliberately no cookie
     });
-    expect(res.headers.get("location")).toBeFalsy();
-    const body = await res.text();
-    expect(body).toMatch(/Not signed in/);
+    // Anon users must NOT end up redirected to /room/<code>. Acceptable:
+    //  - 307/303 to /sign-up
+    //  - 200 with the action's "Not signed in." message
+    const loc = res.headers.get("location") ?? "";
+    expect(loc).not.toMatch(/\/room\//);
+    if (res.status >= 300 && res.status < 400) {
+      expect(loc).toMatch(/\/sign-up$|^\/$/);
+    } else {
+      const body = await res.text();
+      expect(body).toMatch(/Not signed in/);
+    }
   });
 });
