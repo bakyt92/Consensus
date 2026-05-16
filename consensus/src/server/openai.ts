@@ -137,3 +137,75 @@ export async function callMediator(args: CallMediatorArgs): Promise<MediatorOutp
   }
   return parsed.data;
 }
+
+// ---------------------------------------------------------------------------
+// Post-meeting Q&A: composes a first-person answer from one participant's
+// own messages. Same structured-output discipline as the mediator.
+// ---------------------------------------------------------------------------
+
+export const ParticipantAnswer = z.object({
+  answer: z.string().min(1),
+});
+export type ParticipantAnswer = z.infer<typeof ParticipantAnswer>;
+
+const PARTICIPANT_ANSWER_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["answer"],
+  properties: {
+    answer: { type: "string" },
+  },
+} as const;
+
+export type ParticipantMessage = { seq: number; text: string };
+
+export async function answerAsParticipant(args: {
+  systemPrompt: string;
+  username: string;
+  messages: ParticipantMessage[];
+  question: string;
+}): Promise<ParticipantAnswer> {
+  const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+  const system = args.systemPrompt.replaceAll("{{username}}", args.username);
+  const transcript =
+    args.messages.length === 0
+      ? "(no messages from this participant in this meeting)"
+      : args.messages.map((m) => `[seq=${m.seq}] ${m.text}`).join("\n");
+  const user =
+    `PARTICIPANT MESSAGES (verbatim, in order):\n${transcript}\n\n` +
+    `QUESTION FROM ANOTHER PARTICIPANT: ${args.question}`;
+
+  const resp = await _client().chat.completions.create({
+    model,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "ParticipantAnswer",
+        strict: true,
+        schema: PARTICIPANT_ANSWER_SCHEMA,
+      },
+    },
+  });
+
+  const raw = resp.choices[0]?.message?.content;
+  if (!raw) throw new Error("Empty response from OpenAI (answerAsParticipant).");
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      `answerAsParticipant returned non-JSON: ${raw.slice(0, 200)}`,
+    );
+  }
+  const out = ParticipantAnswer.safeParse(parsedJson);
+  if (!out.success) {
+    throw new Error(
+      `answerAsParticipant output failed schema: ${out.error.message.slice(0, 200)}`,
+    );
+  }
+  return out.data;
+}
