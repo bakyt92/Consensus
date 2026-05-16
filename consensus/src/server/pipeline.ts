@@ -33,12 +33,14 @@ declare global {
   var __consensusQueues: Map<string, QueueState> | undefined;
 }
 
+// Pin to globalThis in all environments (see wsHub.ts for the full
+// explanation). Without this, parallel server-action invocations imported
+// through Next's bundle could each see a fresh queue Map and process two
+// messages for the same room concurrently — which violates the serial-
+// pipeline guarantee that the LLM always sees the full ordered transcript.
 const queues: Map<string, QueueState> =
   global.__consensusQueues ?? new Map();
-
-if (process.env.NODE_ENV !== "production") {
-  global.__consensusQueues = queues;
-}
+global.__consensusQueues = queues;
 
 function getQueue(roomId: string): QueueState {
   let q = queues.get(roomId);

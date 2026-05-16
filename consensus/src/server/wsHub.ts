@@ -64,12 +64,17 @@ declare global {
   var __consensusWsHub: Map<string, Set<WsClient>> | undefined;
 }
 
+// We pin to globalThis in ALL environments — not just dev. In production, the
+// custom server (server.ts) is loaded directly by Node and imports this
+// module one way; Next bundles server actions / route handlers and imports
+// it through its own module graph. That can land us with two distinct module
+// instances and two distinct `channels` Maps: server.ts registers connected
+// clients in Map A, the pipeline broadcasts into the (empty) Map B, and no
+// WS frame ever reaches the browser. Stashing the Map on globalThis makes
+// every importer share one Map regardless of who loaded the module first.
 const channels: Map<string, Set<WsClient>> =
   global.__consensusWsHub ?? new Map();
-
-if (process.env.NODE_ENV !== "production") {
-  global.__consensusWsHub = channels;
-}
+global.__consensusWsHub = channels;
 
 export function register(roomId: string, client: WsClient) {
   let set = channels.get(roomId);

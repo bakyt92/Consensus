@@ -101,11 +101,36 @@ async function attach(ws: WebSocket, roomId: string, userId: string) {
     console.error("participants refresh failed", err);
   });
 
+  // Heartbeat: ping every 30s. nginx in front of us has
+  // proxy_read_timeout 120s and drops any connection that goes silent for
+  // 2 minutes. Without this, a user idle on the room page lost their WS
+  // every two minutes; messages sent during the reconnect window were
+  // broadcast to nobody and only appeared after the next snapshot.
+  let alive = true;
+  ws.on("pong", () => {
+    alive = true;
+  });
+  const heartbeat = setInterval(() => {
+    if (!alive) {
+      clearInterval(heartbeat);
+      ws.terminate();
+      return;
+    }
+    alive = false;
+    try {
+      ws.ping();
+    } catch {
+      clearInterval(heartbeat);
+    }
+  }, 30_000);
+
   ws.on("close", () => {
+    clearInterval(heartbeat);
     unregister(roomId, client);
     void refreshParticipants(roomId).catch(() => {});
   });
   ws.on("error", () => {
+    clearInterval(heartbeat);
     unregister(roomId, client);
   });
 
