@@ -72,7 +72,7 @@ const RESPONSE_SCHEMA = {
 } as const;
 
 export type ConversationItem = {
-  role: "system" | "user" | "mediator";
+  role: "system" | "user" | "mediator" | "research";
   username: string | null;
   text: string;
   filtered: boolean;
@@ -96,6 +96,7 @@ export async function callMediator(args: CallMediatorArgs): Promise<MediatorOutp
     .map((m) => {
       if (m.role === "system") return `[system] ${m.text}`;
       if (m.role === "mediator") return `[mediator] ${m.text}`;
+      if (m.role === "research") return `[research note] ${m.text}`;
       return `[${m.username ?? "participant"}] ${m.text}`;
     })
     .join("\n");
@@ -163,6 +164,88 @@ export async function callMediator(args: CallMediatorArgs): Promise<MediatorOutp
     );
   }
   return parsed.data;
+}
+
+// ---------------------------------------------------------------------------
+// Tavily query rewrite: voice-transcribed messages are noisy ("it's not
+// perfect yes like check what colors we could use for china"). We ask the
+// model to extract a clean, search-engine-friendly query using the meeting's
+// agenda as topical context.
+// ---------------------------------------------------------------------------
+
+export const SearchQueryOutput = z.object({
+  searchQuery: z.string().min(2).max(200),
+  intent: z.string().min(2).max(300),
+});
+export type SearchQueryOutput = z.infer<typeof SearchQueryOutput>;
+
+const SEARCH_QUERY_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["searchQuery", "intent"],
+  properties: {
+    searchQuery: {
+      type: "string",
+      description:
+        "A clean web-search query (3-12 words). No filler words, no first-person, no transcription artefacts. Bias toward concrete nouns the agenda implies.",
+    },
+    intent: {
+      type: "string",
+      description:
+        "One-sentence restatement of what the participant is actually asking for, in plain English.",
+    },
+  },
+} as const;
+
+export async function rewriteForWebSearch(args: {
+  agenda: string;
+  criteria: string;
+  rawMessage: string;
+}): Promise<SearchQueryOutput> {
+  const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+  const system =
+    "You translate a participant's noisy in-meeting message (often a voice transcript) into a clean web search query. " +
+    "Use the meeting's agenda as topical context so the query lands on the right domain. " +
+    "Drop filler words, false starts, and first-person phrasing. If the message is too vague to search, infer the closest concrete question the participant likely meant given the agenda.";
+  const user =
+    `MEETING AGENDA:\n${args.agenda}\n\n` +
+    `EVALUATION CRITERIA:\n${args.criteria}\n\n` +
+    `PARTICIPANT MESSAGE (verbatim, possibly voice-transcribed):\n${args.rawMessage}\n\n` +
+    `Produce a JSON object with a clean searchQuery and a one-sentence intent.`;
+
+  const resp = await _client().chat.completions.create({
+    model,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "SearchQueryOutput",
+        strict: true,
+        schema: SEARCH_QUERY_SCHEMA,
+      },
+    },
+  });
+
+  const raw = resp.choices[0]?.message?.content;
+  if (!raw) throw new Error("Empty response from OpenAI (rewriteForWebSearch).");
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      `rewriteForWebSearch returned non-JSON: ${raw.slice(0, 200)}`,
+    );
+  }
+  const out = SearchQueryOutput.safeParse(parsedJson);
+  if (!out.success) {
+    throw new Error(
+      `rewriteForWebSearch failed schema: ${out.error.message.slice(0, 200)}`,
+    );
+  }
+  return out.data;
 }
 
 // ---------------------------------------------------------------------------

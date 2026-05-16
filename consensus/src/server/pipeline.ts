@@ -60,7 +60,7 @@ async function nextSeq(roomId: string): Promise<number> {
   return (last?.seq ?? 0) + 1;
 }
 
-async function broadcastMessage(roomId: string, messageId: string) {
+export async function broadcastMessage(roomId: string, messageId: string) {
   const m = await prisma.message.findUnique({
     where: { id: messageId },
     include: { user: { select: { username: true } } },
@@ -70,7 +70,7 @@ async function broadcastMessage(roomId: string, messageId: string) {
     type: "message",
     message: {
       id: m.id,
-      role: m.role as "system" | "user" | "mediator",
+      role: m.role as "system" | "user" | "mediator" | "research",
       text: m.text,
       filtered: m.filtered,
       userId: m.userId,
@@ -85,6 +85,10 @@ async function broadcastMessage(roomId: string, messageId: string) {
       spans: parseSpans(m.spans),
     },
   });
+}
+
+export async function nextSeqExternal(roomId: string): Promise<number> {
+  return nextSeq(roomId);
 }
 
 function parseSpans(raw: string | null): WsSpan[] | null {
@@ -104,7 +108,7 @@ async function loadHistory(roomId: string): Promise<ConversationItem[]> {
     include: { user: { select: { username: true } } },
   });
   return rows.map((m) => ({
-    role: m.role as "system" | "user" | "mediator",
+    role: m.role as "system" | "user" | "mediator" | "research",
     username: m.user?.username ?? null,
     text: m.text,
     filtered: m.filtered,

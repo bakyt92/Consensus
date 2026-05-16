@@ -38,7 +38,7 @@ export type WsSpan = {
 
 export type WsMessage = {
   id: string;
-  role: "system" | "user" | "mediator";
+  role: "system" | "user" | "mediator" | "research";
   text: string;
   filtered: boolean;
   userId: string | null;

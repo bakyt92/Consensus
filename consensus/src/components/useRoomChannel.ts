@@ -15,7 +15,7 @@ export type Sentiment = "positive" | "negative" | "neutral";
 
 export type RoomMessage = {
   id: string;
-  role: "system" | "user" | "mediator";
+  role: "system" | "user" | "mediator" | "research";
   text: string;
   filtered: boolean;
   userId: string | null;

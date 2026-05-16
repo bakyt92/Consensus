@@ -21,6 +21,7 @@
 #     PIONEER_API_KEY  — optional (on-topic + GLiNER classifier).
 #     SLNG_API_KEY     — optional (diarized STT). NOTE: it's S-L-N-G,
 #                        not S-N-L-G — the app reads SLNG_API_KEY.
+#     TAVILY_API_KEY   — optional (Tavily web search for the Research chip).
 #     RESEND_API_KEY   — required to actually deliver magic-link emails.
 #     RESEND_FROM      — the verified sender, e.g. "Consensus <no-reply@…>".
 #
@@ -118,6 +119,7 @@ jobs:
           GRADIUM_API_KEY: ${{ secrets.GRADIUM_API_KEY }}
           PIONEER_API_KEY: ${{ secrets.PIONEER_API_KEY }}
           SLNG_API_KEY: ${{ secrets.SLNG_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM: ${{ secrets.RESEND_FROM }}
         run: |
@@ -131,6 +133,7 @@ jobs:
             printf "GRADIUM_API_KEY=%s\n"  "$GRADIUM_API_KEY"
             printf "PIONEER_API_KEY=%s\n"  "$PIONEER_API_KEY"
             printf "SLNG_API_KEY=%s\n"     "$SLNG_API_KEY"
+            printf "TAVILY_API_KEY=%s\n"   "$TAVILY_API_KEY"
             printf "RESEND_API_KEY=%s\n"   "$RESEND_API_KEY"
             printf "RESEND_FROM=%s\n"      "$RESEND_FROM"
           } > .env.deploy
