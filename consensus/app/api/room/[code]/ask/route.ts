@@ -122,6 +122,9 @@ export async function POST(
       const synth = await synthesizeSpeech({
         text: answer,
         voiceId: targetMembership.voiceId,
+        // The stored voiceId is an ElevenLabs cloned voice — force the
+        // direct path so SLNG presets don't override it.
+        preferDirect: true,
       });
       if (synth) {
         const b64 = Buffer.from(synth.audio).toString("base64");

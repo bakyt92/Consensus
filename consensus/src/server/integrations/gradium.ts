@@ -24,7 +24,14 @@
 const SLNG_ORPHEUS_PATH = "/v1/tts/slng/canopylabs/orpheus:en";
 const SLNG_AURA_PATHS = ["/v1/tts/deepgram/aura:2", "/v1/tts/deepgram/aura-2"];
 
-export type SynthesizeArgs = { text: string; voiceId: string };
+export type SynthesizeArgs = {
+  text: string;
+  voiceId: string;
+  // Set true when voiceId is an ElevenLabs cloned voice. Forces direct
+  // ElevenLabs because SLNG's Orpheus/Aura paths use their own preset
+  // voices and would ignore the clone id.
+  preferDirect?: boolean;
+};
 export type SynthesizeResult = { audio: Uint8Array; mime: string } | null;
 
 export function gradiumIsConfigured(): boolean {
@@ -37,7 +44,9 @@ export function gradiumIsConfigured(): boolean {
 export async function synthesizeSpeech(
   args: SynthesizeArgs,
 ): Promise<SynthesizeResult> {
-  const forceDirect = process.env.TTS_FALLBACK_DIRECT_ELEVENLABS === "1";
+  const forceDirect =
+    args.preferDirect === true ||
+    process.env.TTS_FALLBACK_DIRECT_ELEVENLABS === "1";
 
   if (!forceDirect && process.env.SLNG_API_KEY) {
     try {
