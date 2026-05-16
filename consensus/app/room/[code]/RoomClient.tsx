@@ -134,7 +134,13 @@ export function RoomClient(props: Props) {
       if (stubbed) setError("Voice in stub mode — set SLNG_API_KEY for real STT.");
     },
   });
-  const tts = useVoicePlayback({ code: props.code, messages });
+  const tts = useVoicePlayback({
+    code: props.code,
+    messages,
+    // Silence the mediator while the user is actively recording so the
+    // mic doesn't pick up TTS audio (or talk over the speaker).
+    suspended: voice.isRecording,
+  });
 
   return (
     <div className="room">
