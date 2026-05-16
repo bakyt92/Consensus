@@ -86,6 +86,7 @@ export type CallMediatorArgs = {
   criteria: string;
   history: ConversationItem[];
   newMessage: { username: string; text: string } | null;
+  participants?: { username: string; role: "admin" | "participant" }[];
 };
 
 export async function callMediator(args: CallMediatorArgs): Promise<MediatorOutput> {
@@ -99,11 +100,29 @@ export async function callMediator(args: CallMediatorArgs): Promise<MediatorOutp
     })
     .join("\n");
 
+  const roster =
+    args.participants && args.participants.length > 0
+      ? args.participants
+          .map(
+            (p) =>
+              `- ${p.username}${p.role === "admin" ? " (facilitator)" : ""}`,
+          )
+          .join("\n")
+      : null;
+
   const userBlocks: string[] = [
     `AGENDA:\n${args.agenda}`,
     `EVALUATION CRITERIA:\n${args.criteria}`,
-    `TRANSCRIPT (ordered, filtered messages already removed):\n${transcript || "(no messages yet)"}`,
   ];
+  if (roster) {
+    userBlocks.push(
+      `PARTICIPANTS PRESENT (${args.participants!.length}):\n${roster}\n\n` +
+        `These are the ONLY people in this meeting. Agreement among them is the whole room — do not stall waiting for unseen voices.`,
+    );
+  }
+  userBlocks.push(
+    `TRANSCRIPT (ordered, filtered messages already removed):\n${transcript || "(no messages yet)"}`,
+  );
   if (args.newMessage) {
     userBlocks.push(
       `NEW MESSAGE from ${args.newMessage.username}: ${args.newMessage.text}`,

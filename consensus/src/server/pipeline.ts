@@ -119,6 +119,19 @@ async function runTurn(
   const systemPrompt = await loadPrompt("system");
   const turnPrompt = await loadPrompt(newMessage ? "turn" : "kickoff");
 
+  const memberships = await prisma.membership.findMany({
+    where: { roomId },
+    include: { user: { select: { username: true } } },
+  });
+  const participants = memberships
+    .filter((m) => m.user)
+    .map((m) => ({
+      username: m.user!.username,
+      role: (m.role === "admin" ? "admin" : "participant") as
+        | "admin"
+        | "participant",
+    }));
+
   const out = await callMediator({
     systemPrompt,
     turnPrompt,
@@ -126,6 +139,7 @@ async function runTurn(
     criteria: room.criteria,
     history,
     newMessage,
+    participants,
   });
 
   // Insert mediator reply only when the model chose to speak. Kickoff
