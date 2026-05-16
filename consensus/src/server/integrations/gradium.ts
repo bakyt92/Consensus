@@ -21,7 +21,7 @@
  * Stub mode: returns null when no provider is configured — UI plays nothing.
  */
 
-const SLNG_ORPHEUS_PATH = "/v1/tts/canopylabs/orpheus";
+const SLNG_ORPHEUS_PATH = "/v1/tts/slng/canopylabs/orpheus:en";
 const SLNG_AURA_PATHS = ["/v1/tts/deepgram/aura:2", "/v1/tts/deepgram/aura-2"];
 
 export type SynthesizeArgs = { text: string; voiceId: string };
@@ -67,14 +67,15 @@ async function viaSlngOrpheus(args: SynthesizeArgs): Promise<SynthesizeResult> {
   const base = process.env.SLNG_API_URL ?? "https://api.slng.ai";
   const voice =
     args.voiceId || process.env.TTS_VOICE_ORPHEUS || "tara";
+  // Orpheus expects { prompt, voice } — note 'prompt' not 'text'.
   const res = await fetch(`${base}${SLNG_ORPHEUS_PATH}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${process.env.SLNG_API_KEY}`,
       "Content-Type": "application/json",
-      Accept: "audio/mpeg",
+      Accept: "audio/*",
     },
-    body: JSON.stringify({ text: args.text, voice }),
+    body: JSON.stringify({ prompt: args.text, voice }),
   });
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
@@ -86,7 +87,8 @@ async function viaSlngOrpheus(args: SynthesizeArgs): Promise<SynthesizeResult> {
 
 async function viaSlngAura(args: SynthesizeArgs): Promise<SynthesizeResult> {
   const base = process.env.SLNG_API_URL ?? "https://api.slng.ai";
-  const voice = process.env.TTS_VOICE_AURA || "asteria-en";
+  // Aura expects { text, model } — voice is selected via the model name.
+  const model = process.env.TTS_VOICE_AURA || "aura-2-thalia-en";
   // Deepgram's own naming uses hyphens; SLNG mostly uses colons. If one 404s
   // we try the other before giving up.
   let lastErr: unknown = null;
@@ -98,7 +100,7 @@ async function viaSlngAura(args: SynthesizeArgs): Promise<SynthesizeResult> {
         "Content-Type": "application/json",
         Accept: "audio/mpeg",
       },
-      body: JSON.stringify({ text: args.text, voice }),
+      body: JSON.stringify({ text: args.text, model }),
     });
     if (res.ok) {
       const audio = new Uint8Array(await res.arrayBuffer());

@@ -19,12 +19,6 @@ import { prisma } from "@/src/lib/prisma";
 import { loadPrompt } from "@/src/lib/prompts";
 import { broadcast } from "./wsHub";
 import { callMediator, type ConversationItem } from "./openai";
-import { classifyUtterance } from "./integrations/pioneer";
-
-// If Pioneer is this confident the message is off-topic, skip the OpenAI turn
-// entirely — just mark filtered and broadcast. Keeps GPT off the hot path.
-const PIONEER_SKIP_THRESHOLD = 0.8;
-
 type QueueState = {
   tail: Promise<void>;
   closing: boolean;
@@ -119,40 +113,8 @@ async function runTurn(
     }
   }
 
-  // Two-tier inference: Pioneer first (fast), OpenAI only if message clears
-  // the filter. Skipping OpenAI is the whole point — keeps cost + latency
-  // low and lets the mediator stay quiet on noise.
-  if (newMessageId && newMessage) {
-    const verdict = await classifyUtterance({
-      text: newMessage.text,
-      agenda: room.agenda,
-      criteria: room.criteria,
-      username: newMessage.username,
-    }).catch((err) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      const isCertErr =
-        msg.includes("CERT_HAS_EXPIRED") ||
-        (err as { cause?: { code?: string } } | null)?.cause?.code ===
-          "CERT_HAS_EXPIRED";
-      if (!isCertErr) {
-        console.error("[pipeline] pioneer classify failed, falling through", err);
-      }
-      return null;
-    });
-    if (
-      verdict &&
-      !verdict.isOnTopic &&
-      verdict.confidence >= PIONEER_SKIP_THRESHOLD
-    ) {
-      await prisma.message.update({
-        where: { id: newMessageId },
-        data: { filtered: true },
-      });
-      await broadcastMessage(roomId, newMessageId);
-      return;
-    }
-  }
-
+  // Off-topic filtering disabled: every user message goes to the mediator and
+  // stays visible in chat. Pioneer is skipped to avoid the wasted call.
   const history = await loadHistory(roomId);
   const systemPrompt = await loadPrompt("system");
   const turnPrompt = await loadPrompt(newMessage ? "turn" : "kickoff");
@@ -165,15 +127,6 @@ async function runTurn(
     history,
     newMessage,
   });
-
-  // Mark filtered on the user message if the model said it was off-topic
-  if (newMessageId && !out.isOnTopic) {
-    await prisma.message.update({
-      where: { id: newMessageId },
-      data: { filtered: true },
-    });
-    await broadcastMessage(roomId, newMessageId);
-  }
 
   // Insert mediator reply
   const seq = await nextSeq(roomId);
