@@ -3,7 +3,7 @@ import path from "node:path";
 
 const cache = new Map<string, string>();
 
-export async function loadPrompt(name: "system" | "kickoff" | "turn"): Promise<string> {
+export async function loadPrompt(name: "system" | "kickoff" | "turn" | "qa"): Promise<string> {
   if (cache.has(name) && process.env.NODE_ENV === "production") {
     return cache.get(name)!;
   }
