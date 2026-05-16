@@ -376,29 +376,25 @@ export function RoomClient(props: Props) {
                   disabled={
                     composeDisabled || voice.isUploading || !voice.supported
                   }
-                  onMouseDown={voice.start}
-                  onMouseUp={voice.stop}
-                  onMouseLeave={() => voice.isRecording && voice.stop()}
-                  onTouchStart={(e) => {
-                    e.preventDefault();
-                    void voice.start();
-                  }}
-                  onTouchEnd={(e) => {
-                    e.preventDefault();
-                    voice.stop();
-                  }}
+                  onClick={voice.toggle}
                   title={
                     !voice.supported
                       ? "Voice input not supported in this browser"
                       : voice.isRecording
-                        ? "Release to send"
+                        ? `Recording ${formatElapsed(voice.elapsedMs)} — click to stop`
                         : voice.isUploading
                           ? "Transcribing…"
-                          : "Hold to speak"
+                          : "Click to speak"
                   }
                   type="button"
                 >
-                  <Mic />
+                  {voice.isRecording ? (
+                    <span className="rec-timer" aria-live="polite">
+                      <span className="rec-dot" /> {formatElapsed(voice.elapsedMs)}
+                    </span>
+                  ) : (
+                    <Mic />
+                  )}
                 </button>
                 <button
                   className="icon-btn send"
@@ -589,6 +585,13 @@ export function RoomClient(props: Props) {
       </div>
     </div>
   );
+}
+
+function formatElapsed(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 function ChatBubble({ m, meId }: { m: RoomMessage; meId: string }) {

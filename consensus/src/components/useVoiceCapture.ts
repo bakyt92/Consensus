@@ -13,9 +13,19 @@ export type UseVoiceCaptureOptions = {
 export function useVoiceCapture(opts: UseVoiceCaptureOptions) {
   const [status, setStatus] = useState<Status>("idle");
   const [supported, setSupported] = useState(true);
+  const [elapsedMs, setElapsedMs] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const startedAtRef = useRef<number>(0);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopTicker = useCallback(() => {
+    if (tickRef.current) {
+      clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (
@@ -44,9 +54,11 @@ export function useVoiceCapture(opts: UseVoiceCaptureOptions) {
         if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
       };
       rec.onstop = () => {
+        stopTicker();
         void upload(opts.code, chunksRef.current, rec.mimeType || mime || "audio/webm")
           .then((res) => {
             setStatus("idle");
+            setElapsedMs(0);
             if (res.ok) {
               opts.onTranscript?.(res.text, res.stubbed);
             } else {
@@ -63,6 +75,12 @@ export function useVoiceCapture(opts: UseVoiceCaptureOptions) {
       };
       rec.start();
       recorderRef.current = rec;
+      startedAtRef.current = Date.now();
+      setElapsedMs(0);
+      stopTicker();
+      tickRef.current = setInterval(() => {
+        setElapsedMs(Date.now() - startedAtRef.current);
+      }, 250);
       setStatus("recording");
     } catch (err) {
       setStatus("error");
@@ -78,18 +96,35 @@ export function useVoiceCapture(opts: UseVoiceCaptureOptions) {
   const stop = useCallback(() => {
     const rec = recorderRef.current;
     if (!rec || rec.state === "inactive") return;
+    stopTicker();
     setStatus("uploading");
     rec.stop();
     recorderRef.current = null;
-  }, []);
+  }, [stopTicker]);
 
-  useEffect(() => () => stopStream(), [stopStream]);
+  const toggle = useCallback(() => {
+    if (status === "recording") {
+      stop();
+    } else if (status === "idle" || status === "error") {
+      void start();
+    }
+  }, [status, start, stop]);
+
+  useEffect(
+    () => () => {
+      stopTicker();
+      stopStream();
+    },
+    [stopStream, stopTicker],
+  );
 
   return {
     start,
     stop,
+    toggle,
     status,
     supported,
+    elapsedMs,
     isRecording: status === "recording",
     isUploading: status === "uploading",
   };

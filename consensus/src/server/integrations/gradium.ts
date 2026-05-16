@@ -1,63 +1,108 @@
 /**
- * Gradium adapter — output side.
+ * TTS adapter — Gradium slot, now backed by SLNG's ElevenLabs unified route.
  *
- * Production role: streaming TTS for the mediator's voice during the meeting.
- * v1 exposes a single batch synth call returning the full audio buffer; we
- * can swap to a streamed ReadableStream once the route supports it.
+ * Primary path:    POST {SLNG_API_URL}/v1/tts/elevenlabs/eleven_turbo_v2_5
+ *                  body { text, voice_id, output_format }
+ *                  Authorization: Bearer ${SLNG_API_KEY}
  *
- * Stub mode: when GRADIUM_API_KEY is unset, returns null and the playback
- * route responds 204 No Content. The browser hook treats 204 as a no-op so
- * the mediator simply doesn't speak — but everything else works.
+ * Fallback path:   POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}
+ *                  header xi-api-key: ${ELEVENLABS_API_KEY}
+ *                  body { text, model_id: "eleven_turbo_v2_5" }
+ *                  Used when TTS_FALLBACK_DIRECT_ELEVENLABS=1 or when SLNG
+ *                  returns a non-2xx.
+ *
+ * Stub mode:       Returns null when neither SLNG nor ElevenLabs are
+ *                  configured — UI renders text without audio.
  */
 
-export type SynthesizeArgs = {
-  text: string;
-  voice?: string;
-  format?: "wav" | "mp3";
-};
+const SLNG_TTS_PATH = "/v1/tts/elevenlabs/eleven_turbo_v2_5";
 
-export type SynthesizeResult = {
-  audio: Uint8Array;
-  mime: string;
-};
+export type SynthesizeArgs = { text: string; voiceId: string };
+export type SynthesizeResult = { audio: Uint8Array; mime: string } | null;
 
 export function gradiumIsConfigured(): boolean {
-  return Boolean(process.env.GRADIUM_API_KEY);
+  return (
+    Boolean(process.env.SLNG_API_KEY) ||
+    Boolean(process.env.ELEVENLABS_API_KEY)
+  );
 }
 
 export async function synthesizeSpeech(
   args: SynthesizeArgs,
-): Promise<SynthesizeResult | null> {
-  if (!gradiumIsConfigured()) {
-    console.warn(
-      "[gradium] stub mode — set GRADIUM_API_KEY to enable mediator TTS",
-    );
-    return null;
+): Promise<SynthesizeResult> {
+  const forceDirect = process.env.TTS_FALLBACK_DIRECT_ELEVENLABS === "1";
+
+  if (!forceDirect && process.env.SLNG_API_KEY) {
+    try {
+      return await viaSlng(args);
+    } catch (err) {
+      console.warn(
+        "[tts] SLNG path failed, trying direct ElevenLabs:",
+        err,
+      );
+    }
   }
 
-  const baseUrl = process.env.GRADIUM_API_URL ?? "https://api.gradium.ai";
-  const voiceId =
-    args.voice ?? process.env.GRADIUM_VOICE_ID ?? "YTpq7expH9539ERJ";
+  if (process.env.ELEVENLABS_API_KEY) {
+    return await viaElevenLabsDirect(args);
+  }
 
-  const res = await fetch(`${baseUrl}/api/post/speech/tts`, {
+  console.warn("[tts] no provider configured — returning null audio");
+  return null;
+}
+
+async function viaSlng(args: SynthesizeArgs): Promise<SynthesizeResult> {
+  const base = process.env.SLNG_API_URL ?? "https://api.slng.ai";
+  const res = await fetch(`${base}${SLNG_TTS_PATH}`, {
     method: "POST",
     headers: {
-      "x-api-key": process.env.GRADIUM_API_KEY!,
+      Authorization: `Bearer ${process.env.SLNG_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
       text: args.text,
-      voice_id: voiceId,
-      output_format: "wav",
-      only_audio: true,
+      voice_id: args.voiceId,
+      output_format: "mp3_44100_128",
     }),
   });
-
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
-    throw new Error(`Gradium ${res.status}: ${msg.slice(0, 2000)}`);
+    throw new Error(`SLNG TTS ${res.status}: ${msg.slice(0, 500)}`);
   }
+  const audio = new Uint8Array(await res.arrayBuffer());
+  return {
+    audio,
+    mime: res.headers.get("content-type") ?? "audio/mpeg",
+  };
+}
 
-  const buf = new Uint8Array(await res.arrayBuffer());
-  return { audio: buf, mime: "audio/wav" };
+async function viaElevenLabsDirect(
+  args: SynthesizeArgs,
+): Promise<SynthesizeResult> {
+  const base =
+    process.env.ELEVENLABS_API_URL ?? "https://api.elevenlabs.io";
+  const res = await fetch(
+    `${base}/v1/text-to-speech/${encodeURIComponent(args.voiceId)}`,
+    {
+      method: "POST",
+      headers: {
+        "xi-api-key": process.env.ELEVENLABS_API_KEY!,
+        "Content-Type": "application/json",
+        Accept: "audio/mpeg",
+      },
+      body: JSON.stringify({
+        text: args.text,
+        model_id: "eleven_turbo_v2_5",
+      }),
+    },
+  );
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs TTS ${res.status}: ${msg.slice(0, 500)}`);
+  }
+  const audio = new Uint8Array(await res.arrayBuffer());
+  return {
+    audio,
+    mime: res.headers.get("content-type") ?? "audio/mpeg",
+  };
 }
