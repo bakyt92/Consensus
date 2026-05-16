@@ -167,3 +167,22 @@ export async function requestCloseMeeting(code: string) {
   await requestClose(room.id);
   return { ok: true as const };
 }
+
+export async function setVoiceCloneOptOutAction(
+  code: string,
+  optOut: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await getSessionUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+  const room = await prisma.room.findUnique({ where: { code } });
+  if (!room) return { ok: false, error: "Room not found." };
+  const membership = await prisma.membership.findUnique({
+    where: { roomId_userId: { roomId: room.id, userId: user.id } },
+  });
+  if (!membership) return { ok: false, error: "Not a member of this room." };
+  await prisma.membership.update({
+    where: { id: membership.id },
+    data: { voiceOptOut: optOut },
+  });
+  return { ok: true };
+}
