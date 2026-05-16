@@ -13,7 +13,7 @@
 export type SynthesizeArgs = {
   text: string;
   voice?: string;
-  format?: "mp3" | "wav";
+  format?: "wav" | "mp3";
 };
 
 export type SynthesizeResult = {
@@ -35,13 +35,29 @@ export async function synthesizeSpeech(
     return null;
   }
 
-  // Real SDK goes here. Expected shape:
-  //   POST {GRADIUM_API_URL}/tts with { text, voice, format } and either
-  //   stream the response or read the full body. For low-latency demos we'll
-  //   want to flip this to a streaming response and pipe straight to the
-  //   browser <audio> via fetch().body.
-  void args;
-  throw new Error(
-    "Gradium real integration not yet wired. Drop the SDK call here and remove this throw.",
-  );
+  const baseUrl = process.env.GRADIUM_API_URL ?? "https://api.gradium.ai";
+  const voiceId =
+    args.voice ?? process.env.GRADIUM_VOICE_ID ?? "YTpq7expH9539ERJ";
+
+  const res = await fetch(`${baseUrl}/api/post/speech/tts`, {
+    method: "POST",
+    headers: {
+      "x-api-key": process.env.GRADIUM_API_KEY!,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      text: args.text,
+      voice_id: voiceId,
+      output_format: "wav",
+      only_audio: true,
+    }),
+  });
+
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(`Gradium ${res.status}: ${msg.slice(0, 2000)}`);
+  }
+
+  const buf = new Uint8Array(await res.arrayBuffer());
+  return { audio: buf, mime: "audio/wav" };
 }
