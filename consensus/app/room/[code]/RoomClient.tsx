@@ -22,6 +22,7 @@ import {
   sendMessage,
   lockRoom,
   requestCloseMeeting,
+  setVoiceCloneOptOutAction,
 } from "@/src/lib/room-actions";
 
 type Props = {
@@ -32,6 +33,8 @@ type Props = {
   isAdmin: boolean;
   me: { id: string; username: string };
   adminName: string;
+  voiceOptOut: boolean;
+  voiceCloned: boolean;
 };
 
 export function RoomClient(props: Props) {
@@ -48,7 +51,21 @@ export function RoomClient(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [kebabOpen, setKebabOpen] = useState(false);
   const [, startTransition] = useTransition();
+  const [voiceCloneOff, setVoiceCloneOff] = useState(props.voiceOptOut);
+  const [voiceClonePending, startVoiceCloneTransition] = useTransition();
   const feedRef = useRef<HTMLDivElement | null>(null);
+
+  function toggleVoiceClone() {
+    const next = !voiceCloneOff;
+    setVoiceCloneOff(next);
+    startVoiceCloneTransition(async () => {
+      const r = await setVoiceCloneOptOutAction(props.code, next);
+      if (!r.ok) {
+        console.error(r.error);
+        setVoiceCloneOff(!next);
+      }
+    });
+  }
 
   useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight;
